@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>團隊日報管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -17,7 +17,6 @@
             }
         }
     </script>
-    <!-- Added type="text/tailwindcss" to ensure @apply works correctly -->
     <style type="text/tailwindcss">
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; }
@@ -41,17 +40,19 @@
             @apply bg-corp-600 text-white shadow-md; 
         }
         
-        /* State: Has Data (Uploaded) */
-        .header-tab-btn.has-data .data-dot { @apply scale-100; }
-        .header-tab-btn.no-data .data-dot { @apply scale-0; }
-
-        /* Data Dot Color - White on Active, Green on Inactive */
-        .header-tab-btn.active .data-dot { @apply bg-white; }
-        .header-tab-btn:not(.active) .data-dot { @apply bg-emerald-500; }
-
+        /* Data Dot Styling */
         .data-dot {
-            @apply w-2 h-2 rounded-full transition-transform duration-300;
+            @apply w-2 h-2 rounded-full transition-colors duration-300;
         }
+
+        /* Logic for Active Tab Dots */
+        .header-tab-btn.active.has-data .data-dot { @apply bg-emerald-300; }
+        .header-tab-btn.active.no-data .data-dot { @apply bg-white; }
+
+        /* Logic for Inactive Tab Dots */
+        .header-tab-btn:not(.active).has-data .data-dot { @apply bg-emerald-500; }
+        .header-tab-btn:not(.active).no-data .data-dot { @apply bg-slate-300; }
+
 
         /* Accordion transition */
         .accordion-content {
@@ -76,12 +77,18 @@
 <body class="bg-slate-100 h-screen overflow-hidden text-slate-800 flex">
 
     <!-- Sidebar: History & Tools -->
-    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20 hidden md:flex">
-        <div class="p-4 border-b border-slate-100">
-            <h1 class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                <i class="fa-solid fa-layer-group text-corp-600"></i> 日報管理系統
-            </h1>
-            <p class="text-xs text-slate-400 mt-1">GitHub Page 版本</p>
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20 hidden md:flex transition-all duration-300" id="mainSidebar">
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+            <div>
+                <h1 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-corp-600"></i> 日報管理系統
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">Canvas Preview 版本</p>
+            </div>
+            <!-- Mobile close button -->
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-times"></i>
+            </button>
         </div>
         
         <div class="p-3">
@@ -105,7 +112,7 @@
                 </button>
                 <label class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition text-center cursor-pointer" title="匯入 JSON">
                     <i class="fa-solid fa-upload"></i> 還原
-                    <input type="file" id="importFile" class="hidden" onchange="importData(this)">
+                    <input type="file" id="importFile" class="hidden" onchange="importData(this)" accept=".json">
                 </label>
             </div>
             <button onclick="clearAllData()" class="w-full mt-2 text-rose-500 hover:text-rose-700 text-xs text-center underline">
@@ -115,14 +122,14 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full">
         
         <!-- Toolbar Header -->
         <header class="bg-white border-b border-slate-200 p-3 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm z-10 shrink-0 gap-4 md:gap-0">
-            <div class="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 custom-scroll">
+            <div class="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 custom-scroll no-scrollbar">
                 <!-- Mobile Menu Toggle -->
-                <button onclick="document.querySelector('aside').classList.toggle('hidden'); document.querySelector('aside').classList.toggle('absolute'); document.querySelector('aside').classList.toggle('h-full');" class="md:hidden text-slate-500 hover:text-slate-800">
-                    <i class="fa-solid fa-bars"></i>
+                <button onclick="toggleSidebar()" class="md:hidden text-slate-500 hover:text-slate-800 p-1">
+                    <i class="fa-solid fa-bars text-lg"></i>
                 </button>
 
                 <!-- Date Picker -->
@@ -134,39 +141,39 @@
                 <div class="hidden md:block h-8 w-px bg-slate-200 mx-2 shrink-0"></div>
 
                 <!-- Tabs (Inline classes to ensure Flex layout works correctly) -->
-                <div class="flex items-center bg-white rounded-lg border border-slate-200 p-1 shadow-sm" id="tabContainer">
+                <div class="flex items-center bg-white rounded-lg border border-slate-200 p-1 shadow-sm shrink-0" id="tabContainer">
                     <button onclick="switchTab('ALL')" id="tab-ALL" class="header-tab-btn active">
                         <i class="fa-solid fa-chart-pie"></i> 總覽
                     </button>
                     
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
                     
-                    <button onclick="switchTab('TECH')" id="tab-TECH" class="header-tab-btn">
+                    <button onclick="switchTab('TECH')" id="tab-TECH" class="header-tab-btn no-data">
                         <span class="data-dot"></span> 技術
                     </button>
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
 
-                    <button onclick="switchTab('QA')" id="tab-QA" class="header-tab-btn">
+                    <button onclick="switchTab('QA')" id="tab-QA" class="header-tab-btn no-data">
                         <span class="data-dot"></span> 品檢
                     </button>
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
 
-                    <button onclick="switchTab('CS')" id="tab-CS" class="header-tab-btn">
+                    <button onclick="switchTab('CS')" id="tab-CS" class="header-tab-btn no-data">
                         <span class="data-dot"></span> 客服
                     </button>
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
 
-                    <button onclick="switchTab('WEB')" id="tab-WEB" class="header-tab-btn">
+                    <button onclick="switchTab('WEB')" id="tab-WEB" class="header-tab-btn no-data">
                         <span class="data-dot"></span> 網頁
                     </button>
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
 
-                    <button onclick="switchTab('ART')" id="tab-ART" class="header-tab-btn">
-                        <span class="data-dot"></span> 網頁美術
+                    <button onclick="switchTab('ART')" id="tab-ART" class="header-tab-btn no-data">
+                        <span class="data-dot"></span> 美術
                     </button>
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
 
-                    <button onclick="switchTab('DB')" id="tab-DB" class="header-tab-btn">
+                    <button onclick="switchTab('DB')" id="tab-DB" class="header-tab-btn no-data">
                         <span class="data-dot"></span> 資料庫
                     </button>
                 </div>
@@ -186,41 +193,76 @@
         <!-- Scrollable Content Area -->
         <div class="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6 bg-slate-50">
             
-            <!-- Missing Info Alert (Only visible in ALL tab) -->
-            <div id="missingDataInfo" class="hidden bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 shadow-sm">
-                <div id="missingIconContainer" class="bg-blue-100 text-blue-600 p-2 rounded-full shrink-0">
-                    <i id="missingIcon" class="fa-solid fa-circle-info text-lg"></i>
-                </div>
-                <div class="flex-1">
-                    <h4 class="font-bold text-blue-800 text-sm mb-1">日報資料狀態提示</h4>
-                    <p class="text-sm text-blue-600" id="missingDataText">目前所有組別皆已匯入資料。</p>
-                </div>
+            <!-- Missing Info Alert (Compressed Version) -->
+            <div id="missingDataInfo" class="hidden bg-blue-50 border border-blue-100 rounded-lg py-2 px-3 flex items-center gap-2 shadow-sm mb-2">
+                <i id="missingIcon" class="fa-solid fa-circle-info text-blue-500 text-sm shrink-0"></i>
+                <span id="missingDataText" class="text-xs text-blue-700 font-medium truncate w-full">
+                    目前所有組別皆已匯入資料。
+                </span>
             </div>
 
             <!-- Editor / Input (Hidden in ALL tab) -->
             <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-0 transition-all duration-300 overflow-hidden" id="inputSectionCard">
                 <!-- Header -->
-                <div class="bg-slate-50 border-b border-slate-200 px-4 md:px-6 py-3 flex justify-between items-center">
-                    <label class="font-bold text-slate-700 flex items-center gap-2 text-sm">
-                        <i class="fa-regular fa-keyboard text-slate-400"></i> 
-                        <span id="inputLabelGroup">原始資料輸入</span> 
-                        <span class="text-xs font-mono text-slate-400 bg-slate-100 px-1 rounded">OLD_TS</span>
-                    </label>
+                <div class="bg-slate-50 border-b border-slate-200 px-4 md:px-6 py-3 flex justify-between items-center flex-wrap gap-2">
+                    <div class="flex items-center gap-4">
+                        <label class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                            <i class="fa-regular fa-keyboard text-slate-400"></i> 
+                            <span id="inputLabelGroup">原始資料輸入</span> 
+                        </label>
+                        
+                        <!-- Redmine Source Toggle (QA Only) -->
+                        <div id="qaSourceToggle" class="hidden flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                            <button onclick="setQaInputMode('MANUAL')" id="btn-mode-manual" class="px-3 py-1 text-xs font-bold rounded-md transition-all bg-white text-corp-600 shadow-sm">手動輸入</button>
+                            <button onclick="setQaInputMode('REDMINE')" id="btn-mode-redmine" class="px-3 py-1 text-xs font-bold rounded-md transition-all text-slate-500 hover:text-slate-700">Redmine</button>
+                        </div>
+                    </div>
                     
                     <!-- Tools -->
                     <div class="flex gap-2" id="inputTools">
                         <button onclick="parseData()" class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm">
                             <i class="fa-solid fa-rotate mr-1"></i> 解析資料
                         </button>
-                        <button id="btnLoadDemo" onclick="loadDemo()" class="text-xs text-slate-400 hover:text-corp-600 hover:bg-slate-100 px-2 py-1 rounded transition">
+                        <button id="btnLoadDemo" onclick="loadDemo()" class="text-xs text-slate-400 hover:text-corp-600 hover:bg-slate-100 px-2 py-1 rounded transition border border-slate-200">
                             載入範例
                         </button>
                     </div>
                 </div>
 
-                <!-- Input Area -->
-                <div id="inputAreaContainer" class="p-0">
+                <!-- Input Area Container -->
+                <div id="inputAreaContainer" class="p-0 relative">
+                    
+                    <!-- Manual Textarea -->
                     <textarea id="rawInput" class="w-full h-48 p-4 border-none focus:ring-0 font-mono text-sm bg-white resize-y placeholder-slate-300 outline-none" placeholder="在此貼上日報內容..." oninput="handleInputUpdate()"></textarea>
+                    
+                    <!-- Redmine Importer UI (Hidden by default) -->
+                    <div id="redmineImporter" class="hidden w-full h-48 p-4 bg-slate-50 flex flex-col gap-3 overflow-y-auto">
+                         <div class="flex flex-wrap items-center gap-2 mb-2">
+                             <span class="text-xs font-bold text-slate-600 uppercase bg-slate-200 px-2 py-1 rounded">API 設定</span>
+                         </div>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                             <div>
+                                 <label class="block text-xs font-bold text-slate-500 mb-1">API Key (權杖)</label>
+                                 <input type="password" id="redmineKey" class="w-full border border-slate-300 rounded px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-corp-600 transition" value="e040557087052db42b1016449bfb2f027cbbde78" placeholder="輸入 Redmine API Key">
+                             </div>
+                             <div>
+                                 <label class="block text-xs font-bold text-slate-500 mb-1">Project ID (專案 ID)</label>
+                                 <div class="flex gap-2">
+                                     <input type="text" id="redmineProjectId" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-corp-600 transition" value="old_ts_test" placeholder="例如: old_ts_test">
+                                     <button onclick="fetchRedmineData()" id="btnFetchRedmine" class="bg-corp-600 hover:bg-corp-700 text-white px-4 py-1.5 rounded text-xs font-bold shadow transition whitespace-nowrap">
+                                         <i class="fa-solid fa-cloud-arrow-down mr-1"></i> 撈取工時
+                                     </button>
+                                 </div>
+                             </div>
+                         </div>
+                         
+                         <!-- Status Messages -->
+                         <div id="fetchStatusMsg" class="hidden mt-2 p-2 rounded text-xs"></div>
+
+                         <div class="text-[10px] text-slate-400 mt-auto pt-2 border-t border-slate-200">
+                             資料來源: https://igs.redmine-x.com/time_entries.json
+                         </div>
+                    </div>
                 </div>
             </section>
 
@@ -231,11 +273,12 @@
                         <i class="fa-solid fa-list-check text-slate-400 mr-2"></i> 彙整結果 <span id="resultSectionTitleSuffix" class="text-sm text-slate-400 ml-2 font-normal"></span>
                     </h3>
                 </div>
-                <div id="detailView" class="space-y-4"></div>
+                <!-- Reduced spacing in container -->
+                <div id="detailView" class="space-y-2"></div>
             </section>
 
             <!-- Dashboard Widgets (Moved Down) -->
-            <div id="analysisSection" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div id="analysisSection" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
                 <!-- Work Hours Chart -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
                     <h3 class="font-bold text-slate-700 mb-4 flex items-center">
@@ -287,6 +330,7 @@
         };
         let activeTab = 'ALL'; // Default to ALL
         let parsedData = [];
+        let qaInputMode = 'MANUAL'; // 'MANUAL' or 'REDMINE'
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -294,6 +338,18 @@
             updateHistoryList();
             loadReportByDate(today);
         });
+
+        // Sidebar Toggle Logic for Mobile
+        function toggleSidebar() {
+            const sidebar = document.getElementById('mainSidebar');
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('absolute', 'w-full', 'h-full', 'left-0', 'top-0');
+            } else {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('absolute', 'w-full', 'h-full', 'left-0', 'top-0');
+            }
+        }
 
         function getDB() {
             const data = localStorage.getItem(DB_KEY);
@@ -310,6 +366,7 @@
             // Check status of each group and update UI colors
             ALL_GROUPS.forEach(group => {
                 const btn = document.getElementById(`tab-${group}`);
+                if (!btn) return;
                 const hasData = currentDailyData[group] && currentDailyData[group].trim().length > 0;
                 
                 if (hasData) {
@@ -335,32 +392,28 @@
 
             const infoText = document.getElementById('missingDataText');
             const infoBox = document.getElementById('missingDataInfo');
-            const iconContainer = document.getElementById('missingIconContainer');
             const icon = document.getElementById('missingIcon');
             
             if (missing.length === ALL_GROUPS.length) {
-                infoText.innerHTML = '尚無任何資料，請切換至各組別標籤進行輸入。';
-                infoBox.className = "bg-slate-100 border border-slate-200 rounded-xl p-4 flex items-start gap-3 shadow-sm";
-                icon.className = "fa-solid fa-circle-info text-lg text-slate-400";
-                iconContainer.className = "bg-slate-200 text-slate-500 p-2 rounded-full shrink-0";
+                // All empty
+                infoText.innerHTML = '提示：尚無任何資料，請切換至各組別標籤進行輸入。';
+                infoBox.className = "bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 flex items-center gap-2 shadow-sm mb-2";
+                icon.className = "fa-solid fa-circle-info text-slate-400 text-sm shrink-0";
+                infoText.className = "text-xs text-slate-500 font-medium truncate w-full";
             } else if (missing.length > 0) {
-                // Determine display logic for missing list - if too many, summarize
-                let missingHtml = '';
-                if(missing.length > 3) {
-                   missingHtml = `<span class="font-bold text-rose-600">${missing.length} 個組別</span>`;
-                } else {
-                   missingHtml = `<span class="font-bold text-rose-600">${missing.join('、')}</span>`;
-                }
-
-                infoText.innerHTML = `以下組別尚未匯入資料：${missingHtml}`;
-                infoBox.className = "bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3 shadow-sm";
-                icon.className = "fa-solid fa-triangle-exclamation text-lg text-amber-500";
-                iconContainer.className = "bg-amber-100 text-amber-600 p-2 rounded-full shrink-0";
+                // Some missing - Single line format
+                let missingStr = missing.join('、');
+                // Truncate if too long to keep single line, though flex usually handles it
+                infoText.innerHTML = `提示：以下組別尚未匯入資料：<span class="font-bold">${missingStr}</span>`;
+                infoBox.className = "bg-amber-50 border border-amber-100 rounded-lg py-2 px-3 flex items-center gap-2 shadow-sm mb-2";
+                icon.className = "fa-solid fa-triangle-exclamation text-amber-500 text-sm shrink-0";
+                infoText.className = "text-xs text-amber-700 font-medium truncate w-full";
             } else {
-                infoText.innerHTML = '<span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> 所有組別皆已完成資料匯入。</span>';
-                infoBox.className = "bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-start gap-3 shadow-sm";
-                icon.className = "fa-solid fa-check-circle text-lg text-emerald-500";
-                iconContainer.className = "bg-emerald-100 text-emerald-600 p-2 rounded-full shrink-0";
+                // All done
+                infoText.innerHTML = '提示：所有組別皆已完成資料匯入。';
+                infoBox.className = "bg-emerald-50 border border-emerald-100 rounded-lg py-2 px-3 flex items-center gap-2 shadow-sm mb-2";
+                icon.className = "fa-solid fa-check-circle text-emerald-500 text-sm shrink-0";
+                infoText.className = "text-xs text-emerald-700 font-medium truncate w-full";
             }
         }
 
@@ -377,6 +430,8 @@
             const textarea = document.getElementById('rawInput');
             const labelGroup = document.getElementById('inputLabelGroup');
             const titleSuffix = document.getElementById('resultSectionTitleSuffix');
+            const qaSourceToggle = document.getElementById('qaSourceToggle');
+            const inputTools = document.getElementById('inputTools');
 
             if (tab === 'ALL') {
                 // Overview Mode
@@ -397,14 +452,245 @@
                 labelGroup.innerText = `${getGroupName(tab)} - 原始資料輸入`;
                 textarea.value = currentDailyData[tab] || '';
                 textarea.placeholder = `在此貼上【${getGroupName(tab)}】的 OLD_TS 原始資料...`;
+
+                // QA Specific UI Logic
+                if (tab === 'QA') {
+                    qaSourceToggle.classList.remove('hidden');
+                    // Reset to manual when switching tabs initially or keep state? Let's reset for consistency unless already in QA
+                    // updateQaInputModeUI(); // Call this to ensure correct visibility
+                } else {
+                    qaSourceToggle.classList.add('hidden');
+                    // Force Manual Mode for other tabs UI-wise (hide Redmine panel)
+                    document.getElementById('rawInput').classList.remove('hidden');
+                    document.getElementById('redmineImporter').classList.add('hidden');
+                    inputTools.classList.remove('hidden');
+                }
                 
                 // Trigger parseData again to filter the view ONLY for this tab
                 parseData(false);
                 
                 // Focus slightly delayed to allow UI update
-                setTimeout(() => textarea.focus(), 50);
+                if(tab !== 'QA' || qaInputMode === 'MANUAL') {
+                    setTimeout(() => textarea.focus(), 50);
+                }
             }
         }
+
+        // --- QA SPECIFIC LOGIC ---
+        function setQaInputMode(mode) {
+            qaInputMode = mode;
+            updateQaInputModeUI();
+        }
+
+        function updateQaInputModeUI() {
+            const btnManual = document.getElementById('btn-mode-manual');
+            const btnRedmine = document.getElementById('btn-mode-redmine');
+            const rawInput = document.getElementById('rawInput');
+            const redmineImporter = document.getElementById('redmineImporter');
+            const inputTools = document.getElementById('inputTools');
+
+            if (qaInputMode === 'MANUAL') {
+                btnManual.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
+                btnManual.classList.remove('text-slate-500');
+                btnRedmine.classList.remove('bg-white', 'text-corp-600', 'shadow-sm');
+                btnRedmine.classList.add('text-slate-500');
+                
+                rawInput.classList.remove('hidden');
+                redmineImporter.classList.add('hidden');
+                inputTools.classList.remove('hidden');
+            } else {
+                btnRedmine.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
+                btnRedmine.classList.remove('text-slate-500');
+                btnManual.classList.remove('bg-white', 'text-corp-600', 'shadow-sm');
+                btnManual.classList.add('text-slate-500');
+                
+                rawInput.classList.add('hidden');
+                redmineImporter.classList.remove('hidden');
+                inputTools.classList.add('hidden'); // Hide parser buttons when in Redmine config mode
+            }
+        }
+
+        // --- ROBUST REDMINE FETCH LOGIC (TIME_ENTRIES.JSON) WITH AUTOMATIC PROXY FALLBACK ---
+        async function fetchRedmineData() {
+            const key = document.getElementById('redmineKey').value;
+            const projectId = document.getElementById('redmineProjectId').value;
+            const date = document.getElementById('reportDatePicker').value;
+            
+            const btn = document.getElementById('btnFetchRedmine');
+            const statusMsg = document.getElementById('fetchStatusMsg');
+            
+            // UI Reset
+            statusMsg.className = 'hidden mt-2 p-2 rounded text-xs';
+            statusMsg.innerHTML = '';
+            
+            if (!key || !projectId) return showToast('請輸入 API Key 與 Project ID');
+            if (!date) return showToast('請先選擇上方的「日報日期」');
+
+            // Base URL
+            const targetUrl = `https://igs.redmine-x.com/time_entries.json?project_id=${projectId}&spent_on=${date}&limit=100`;
+            
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 撈取中...';
+            btn.disabled = true;
+
+            const updateStatus = (msg, type) => {
+                statusMsg.classList.remove('hidden', 'bg-rose-50', 'text-rose-700', 'bg-amber-50', 'text-amber-700', 'bg-emerald-50', 'text-emerald-700');
+                if (type === 'error') statusMsg.classList.add('bg-rose-50', 'text-rose-700');
+                else if (type === 'warn') statusMsg.classList.add('bg-amber-50', 'text-amber-700');
+                else statusMsg.classList.add('bg-emerald-50', 'text-emerald-700');
+                statusMsg.innerHTML = msg;
+            };
+
+            // Define Strategies with priorities
+            const strategies = [
+                // 1. Direct fetch with headers (The requested "Standard" way)
+                // Often blocked by browser CORS if server doesn't allow origin
+                {
+                    name: 'Direct (Headers)',
+                    url: targetUrl,
+                    headers: {
+                        "X-Redmine-API-Key": key,
+                        "Content-Type": "application/json"
+                    },
+                    useProxyWrapper: false
+                },
+                // 2. CorsProxy.io (Supports Headers)
+                // A reliable proxy that usually forwards custom headers
+                {
+                    name: 'CorsProxy',
+                    url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+                    headers: {
+                        "X-Redmine-API-Key": key
+                    },
+                    useProxyWrapper: false
+                },
+                // 3. Direct Simple Request (Key in URL, No Custom Headers)
+                // Sometimes bypasses strict Preflight checks
+                {
+                    name: 'Direct (Simple)',
+                    url: `${targetUrl}&key=${key}`,
+                    headers: {},
+                    useProxyWrapper: false
+                },
+                // 4. AllOrigins (Last Resort)
+                // JSONP style, very robust against CORS but can be slower
+                {
+                    name: 'AllOrigins',
+                    url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl + '&key=' + key)}`,
+                    headers: {},
+                    useProxyWrapper: true // response is wrapped in { contents: "..." }
+                }
+            ];
+
+            let successData = null;
+            let lastError = null;
+
+            // Execute Strategies Sequence
+            for (const strategy of strategies) {
+                console.log(`Trying Strategy: ${strategy.name}`);
+                
+                if (strategy.name !== 'Direct (Headers)') {
+                    updateStatus(`<i class="fa-solid fa-rotate-right fa-spin mr-1"></i> 連線受阻，切換策略 (${strategy.name})...`, 'warn');
+                }
+
+                try {
+                    const response = await fetch(strategy.url, {
+                        method: 'GET',
+                        headers: strategy.headers
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    let data = await response.json();
+
+                    // Unwrap proxy response if needed
+                    if (strategy.useProxyWrapper) {
+                        if (data.contents) {
+                            data = JSON.parse(data.contents);
+                        } else {
+                            throw new Error("Invalid Proxy Wrapper Response");
+                        }
+                    }
+
+                    // Validate Data
+                    if (data && data.time_entries) {
+                        successData = data;
+                        break; // Stop loop, we got data
+                    } else {
+                        throw new Error("Invalid Data Format");
+                    }
+
+                } catch (e) {
+                    console.warn(`Strategy ${strategy.name} Failed:`, e);
+                    lastError = e;
+                    // Continue to next strategy
+                }
+            }
+
+            if (successData) {
+                processRedmineData(successData.time_entries);
+                showToast('Redmine 工時資料匯入成功');
+                setQaInputMode('MANUAL');
+                statusMsg.className = 'hidden'; 
+            } else {
+                 console.error("All strategies failed", lastError);
+                 updateStatus(`<strong>撈取失敗</strong><br>所有連線方式皆失敗。<br>1. 請檢查 API Key 是否正確<br>2. 請確認網路環境 (VPN/防火牆)<br><span class="opacity-75">錯誤: ${lastError ? lastError.message : 'Unknown'}</span>`, 'error');
+                 showToast('撈取失敗，請查看錯誤訊息');
+            }
+            
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down mr-1"></i> 撈取工時';
+            btn.disabled = false;
+        }
+
+        function processRedmineData(entries) {
+            if (!entries || entries.length === 0) return showToast('無資料可匯入 (本日無工時)');
+
+            // 1. Group by User Name
+            const userMap = {};
+            
+            entries.forEach(entry => {
+                const userName = entry.user ? entry.user.name : 'Unknown';
+                
+                if (!userMap[userName]) {
+                    userMap[userName] = {
+                        hours: 0,
+                        tasks: []
+                    };
+                }
+                
+                const hoursVal = entry.hours ? parseFloat(entry.hours) : 0;
+                userMap[userName].hours += hoursVal;
+                
+                // Map fields from Time Entry
+                const projectName = entry.project ? entry.project.name : 'Unknown';
+                const issueId = entry.issue ? entry.issue.id : 'General';
+                const comments = entry.comments || '';
+                const activity = entry.activity ? entry.activity.name : '';
+                
+                // Format: 【Project】 Activity #IssueID: Comments ｜ Hours
+                const line = `【${projectName}】 ${activity} #${issueId}: ${comments}｜${hoursVal.toFixed(2)}編輯 刪除 動作`;
+                userMap[userName].tasks.push(line);
+            });
+
+            // 2. Convert to OLD_TS String Format
+            let finalOutput = "";
+            
+            Object.keys(userMap).forEach(userName => {
+                const user = userMap[userName];
+                const header = `OLD_TS品檢${userName} ${user.hours.toFixed(2)} 小時: ${user.hours.toFixed(2)} 全部摺疊/全部展開`;
+                const body = user.tasks.join(' ');
+                finalOutput += `${header}${body} `;
+            });
+
+            // 3. Update Data
+            currentDailyData['QA'] = finalOutput;
+            document.getElementById('rawInput').value = finalOutput;
+            
+            // 4. Update UI
+            updateTabUI();
+            parseData(false);
+            saveCurrentReport(); 
+        }
+
 
         function getGroupName(code) {
             const map = { 
@@ -413,11 +699,90 @@
                 'QA': '品檢', 
                 'CS': '客服', 
                 'WEB': '網頁',
-                'ART': '網頁美術',
+                'ART': '美術',
                 'DB': '資料庫'
             };
             return map[code] || code;
         }
+
+        // --- NEW PARSING LOGIC MODULES ---
+        const GroupParsers = {
+            _commonParse: function(rawContent, groupCode, groupNameLabel) {
+                const results = [];
+                const rawPeople = rawContent.split('OLD_TS').filter(item => item.trim().length > 0);
+                
+                rawPeople.forEach(personBlock => {
+                    const headerMatch = personBlock.match(/^\s*(.+?)[\s\d]+小時:\s*([\d\.]+)/);
+                    if (headerMatch) {
+                        let originalName = headerMatch[1].trim(); 
+                        let name = originalName;
+                        
+                        // Clean up name prefix if it exists in the raw text
+                        ['品檢', '客服', '網頁', '技術', '美術', '資料庫'].forEach(prefix => {
+                             if(name.startsWith(prefix)) name = name.substring(prefix.length).trim();
+                        });
+
+                        const totalHours = parseFloat(headerMatch[2]);
+
+                        let taskString = personBlock.replace(headerMatch[0], '').replace(/全部摺疊\/全部展開/g, '');
+                        const rawTasks = taskString.split(/編輯\s+刪除\s+動作/);
+                        const tasks = [];
+
+                        rawTasks.forEach(t => {
+                            t = t.trim();
+                            if (t.length === 0) return;
+                            const idMatch = t.match(/#(\d+)/);
+                            const id = idMatch ? idMatch[1] : '';
+                            let project = '其他';
+                            if (t.includes('】') && t.includes('#')) {
+                                const match = t.match(/】(.*?)#/);
+                                if (match) project = match[1].trim();
+                            } else if (t.includes('#')) {
+                                project = t.split('#')[0].replace(/【.*?】/g, '').trim();
+                            } else if (t.includes('【')) {
+                                const match = t.match(/【(.*?)】/);
+                                if(match) project = match[1];
+                            }
+                            project = project.replace(/測試|支援|功能/g, '').trim();
+                            const hoursMatch = t.match(/(\d+\.\d+)$/);
+                            const taskHours = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
+                            let content = t;
+                            let category = '';
+                            if (idMatch) {
+                                const parts = t.split('#' + id);
+                                if (parts[1]) {
+                                    let rightSide = parts[1];
+                                    if (hoursMatch) rightSide = rightSide.substring(0, rightSide.lastIndexOf(hoursMatch[0]));
+                                    rightSide = rightSide.trim();
+                                    if (rightSide.startsWith(':')) rightSide = rightSide.substring(1).trim();
+                                    const contentStartRegex = /(測試項目數|回報問題數|測試內容|問題回報|回報問題)/;
+                                    const splitMatch = rightSide.search(contentStartRegex);
+                                    if (splitMatch !== -1) {
+                                        category = rightSide.substring(0, splitMatch).trim();
+                                        content = rightSide.substring(splitMatch).trim();
+                                    } else {
+                                        category = rightSide; content = '';
+                                    }
+                                    if (category.endsWith('｜')) category = category.slice(0, -1).trim();
+                                }
+                            }
+                            tasks.push({ project, category, id, content, hours: taskHours });
+                        });
+                        
+                        // Use the provided groupNameLabel
+                        results.push({ name, group: groupNameLabel, totalHours, tasks });
+                    }
+                });
+                return results;
+            },
+            
+            TECH: { parse: (txt) => GroupParsers._commonParse(txt, 'TECH', '技術') },
+            QA:   { parse: (txt) => GroupParsers._commonParse(txt, 'QA', '品檢') },
+            CS:   { parse: (txt) => GroupParsers._commonParse(txt, 'CS', '客服') },
+            WEB:  { parse: (txt) => GroupParsers._commonParse(txt, 'WEB', '網頁') },
+            ART:  { parse: (txt) => GroupParsers._commonParse(txt, 'ART', '美術') },
+            DB:   { parse: (txt) => GroupParsers._commonParse(txt, 'DB', '資料庫') }
+        };
 
         function handleInputUpdate() {
             if (activeTab === 'ALL') return;
@@ -496,6 +861,7 @@
             const today = new Date().toISOString().split('T')[0];
             loadReportByDate(today);
             switchTab('ALL');
+            showToast(`已切換至今日 (${today})`);
         }
 
         function handleDateChange() {
@@ -518,28 +884,77 @@
             parseData(false);
         }
 
-        function deleteCurrentReport() {
-            if(!confirm('確定要刪除這天的日報嗎？無法復原。')) return;
+        // --- EXPORT / IMPORT / CLEAR ACTIONS (IMPLEMENTED) ---
+        function exportData() {
             const db = getDB();
-            delete db[currentReportDate];
-            saveDB(db);
-            loadReportByDate(new Date().toISOString().split('T')[0]);
-            showToast('已刪除');
+            if (Object.keys(db).length === 0) return showToast('目前無任何資料可備份');
+            
+            const dataStr = JSON.stringify(db, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `daily_report_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('備份檔案下載中');
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    // Basic validation
+                    if (typeof data !== 'object') throw new Error('Invalid JSON');
+                    
+                    saveDB(data);
+                    
+                    // Reload current date to reflect changes
+                    loadReportByDate(currentReportDate);
+                    showToast('資料還原成功');
+                } catch (error) {
+                    console.error(error);
+                    showToast('檔案格式錯誤，無法匯入');
+                }
+                // Reset input
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllData() {
+            if (confirm('警告：確定要清空所有歷史紀錄嗎？此動作無法復原。')) {
+                localStorage.removeItem(DB_KEY);
+                // Reset current view
+                const today = new Date().toISOString().split('T')[0];
+                loadReportByDate(today);
+                showToast('所有資料已清空');
+            }
         }
 
         // --- PARSING LOGIC ---
         function loadDemo() {
-            const demoText = `專案議題回應小時  OLD_TS品檢呂孟軒 4 小時: 8.00 全部摺疊/全部展開【品檢組】網頁組測試 #221233: [智能行銷]20251211版更品檢測試測試項目數：11｜問題回報：7｜測試內容：開案、展表、介面功能驗證、與窗口討論測試內容、確認規格｜3.50編輯 刪除 動作`;
+            const demoText = `專案議題回應小時  OLD_TS品檢呂孟軒 4 小時: 8.00 全部摺疊/全部展開【品檢組】網頁組測試 #221233: [智能行銷]20251211版更品檢測試測試項目數：11｜問題回報：7｜測試內容：開案、展表、介面功能驗證、與窗口討論測試內容、確認規格｜3.50編輯 刪除 動作 支援測試 #999999: [會員系統]壓力測試｜4.50編輯 刪除 動作`;
             
             if (activeTab === 'ALL') {
-                alert("請先切換至特定組別 (如：品檢組) 再載入範例");
+                alert("請先切換至特定組別 (如：品檢、技術) 再載入範例");
                 return;
             }
             
             currentDailyData[activeTab] = demoText;
             document.getElementById('rawInput').value = demoText;
             updateTabUI();
-            saveCurrentReport(); 
+            
+            // Auto parse and save for convenience
+            parseData();
+            showToast('範例資料已載入');
         }
 
         function parseData(scroll = true) {
@@ -558,74 +973,21 @@
                 if(!rawContent || !rawContent.trim()) return;
 
                 hasAnyData = true;
-                const groupName = getGroupName(groupCode); // Get official group name
                 
-                const rawPeople = rawContent.split('OLD_TS').filter(item => item.trim().length > 0);
+                // DELEGATE PARSING TO MODULE
+                const groupParser = GroupParsers[groupCode];
+                if (!groupParser) {
+                    console.error("No parser found for", groupCode);
+                    return;
+                }
 
-                rawPeople.forEach(personBlock => {
-                    const headerMatch = personBlock.match(/^\s*(.+?)[\s\d]+小時:\s*([\d\.]+)/);
-                    if (headerMatch) {
-                        let originalName = headerMatch[1].trim(); 
-                        let name = originalName;
-                        
-                        // Clean up name prefix if it exists in the raw text, 
-                        // but relies on groupName for the official tag
-                        ['品檢', '客服', '網頁', '技術', '美術', '資料庫'].forEach(prefix => {
-                             if(name.startsWith(prefix)) name = name.substring(prefix.length).trim();
-                        });
-
-                        const totalHours = parseFloat(headerMatch[2]);
-                        totalTeamHours += totalHours;
-
-                        let taskString = personBlock.replace(headerMatch[0], '').replace(/全部摺疊\/全部展開/g, '');
-                        const rawTasks = taskString.split(/編輯\s+刪除\s+動作/);
-                        const tasks = [];
-
-                        rawTasks.forEach(t => {
-                            t = t.trim();
-                            if (t.length === 0) return;
-                            const idMatch = t.match(/#(\d+)/);
-                            const id = idMatch ? idMatch[1] : '';
-                            let project = '其他';
-                            if (t.includes('】') && t.includes('#')) {
-                                const match = t.match(/】(.*?)#/);
-                                if (match) project = match[1].trim();
-                            } else if (t.includes('#')) {
-                                project = t.split('#')[0].replace(/【.*?】/g, '').trim();
-                            } else if (t.includes('【')) {
-                                const match = t.match(/【(.*?)】/);
-                                if(match) project = match[1];
-                            }
-                            project = project.replace(/測試|支援|功能/g, '').trim();
-                            const hoursMatch = t.match(/(\d+\.\d+)$/);
-                            const taskHours = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
-                            let content = t;
-                            let category = '';
-                            if (idMatch) {
-                                const parts = t.split('#' + id);
-                                if (parts[1]) {
-                                    let rightSide = parts[1];
-                                    if (hoursMatch) rightSide = rightSide.substring(0, rightSide.lastIndexOf(hoursMatch[0]));
-                                    rightSide = rightSide.trim();
-                                    if (rightSide.startsWith(':')) rightSide = rightSide.substring(1).trim();
-                                    const contentStartRegex = /(測試項目數|回報問題數|測試內容|問題回報|回報問題)/;
-                                    const splitMatch = rightSide.search(contentStartRegex);
-                                    if (splitMatch !== -1) {
-                                        category = rightSide.substring(0, splitMatch).trim();
-                                        content = rightSide.substring(splitMatch).trim();
-                                    } else {
-                                        category = rightSide; content = '';
-                                    }
-                                    if (category.endsWith('｜')) category = category.slice(0, -1).trim();
-                                }
-                            }
-                            tasks.push({ project, category, id, content, hours: taskHours });
-                        });
-                        
-                        // Push with explicitly derived groupName from tab
-                        parsedData.push({ name, group: groupName, totalHours, tasks });
-                    }
-                });
+                const groupResult = groupParser.parse(rawContent);
+                
+                if (groupResult && groupResult.length > 0) {
+                     parsedData = parsedData.concat(groupResult);
+                     // Accumulate hours for total stat
+                     groupResult.forEach(p => totalTeamHours += p.totalHours);
+                }
             });
 
             // Even if we are in a tab with no data, we should render empty view
@@ -761,14 +1123,14 @@
                 if (p.totalHours > 10) hoursColor = 'bg-rose-100 text-rose-800';
 
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden';
+                card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
                 
-                // Add Group to Name Display - NOW USING p.group directly from loop source
-                const displayName = p.group ? `<span class="text-xs text-slate-400 block mb-0.5">[${p.group}]</span>${p.name}` : p.name;
+                // Add Group to Name Display - Compact One-Line Version
+                const displayName = p.group ? `<span class="text-xs text-slate-500 mr-1">[${p.group}]</span>${p.name}` : p.name;
                 
                 let tasksHtml = p.tasks.map((t, tIndex) => `
                     <div class="border-b border-slate-100 last:border-0">
-                        <button class="accordion-btn w-full text-left p-3 flex items-center justify-between hover:bg-slate-50 transition group focus:outline-none" onclick="toggleTask(this)" aria-expanded="false">
+                        <button class="accordion-btn w-full text-left p-2 flex items-center justify-between hover:bg-slate-50 transition group focus:outline-none" onclick="toggleTask(this)" aria-expanded="false">
                             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 pr-4">
                                 <span class="text-xs font-bold text-slate-800">${t.project}</span>
                                 <span class="text-[10px] font-mono text-slate-400">#${t.id}</span>
@@ -778,7 +1140,7 @@
                             <i class="fa-solid fa-chevron-down text-slate-300 text-xs accordion-icon group-hover:text-corp-600"></i>
                         </button>
                         <div class="accordion-content bg-slate-50/50">
-                            <div class="text-xs leading-relaxed pl-1 pt-2 border-t border-slate-100 border-dashed mx-3">
+                            <div class="text-xs leading-relaxed pl-1 pt-2 border-t border-slate-100 border-dashed mx-3 mb-0">
                                 ${formatContentForWeb(t.content)}
                             </div>
                         </div>
@@ -786,8 +1148,10 @@
                 `).join('');
 
                 card.innerHTML = `
-                    <div class="p-3 md:w-28 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 shrink-0">
-                        <div class="font-bold text-sm text-slate-800 text-center leading-tight">${displayName}</div>
+                    <div class="p-2 md:w-24 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
+                        <div class="font-bold text-sm text-slate-800 text-center leading-tight">
+                            ${displayName}
+                        </div>
                         <div class="px-2 py-0.5 rounded-full text-[10px] font-bold ${hoursColor}">${p.totalHours.toFixed(1)}h</div>
                     </div>
                     <div class="flex-1 bg-white flex flex-col">${tasksHtml}</div>
@@ -796,8 +1160,6 @@
             });
         }
 
-        // --- COPY & TOAST ---
-        // Removed Copy Functionality and Buttons as requested, keeping Toast for Save status
         function showToast(msg) {
             const toast = document.getElementById('toast');
             toast.innerText = msg;
