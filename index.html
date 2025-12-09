@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>團隊日報管理系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        corp: { 50: '#f0f9ff', 100: '#e0f2fe', 600: '#0284c7', 800: '#075985' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .active-date { background-color: #e0f2fe; border-right: 4px solid #0284c7; color: #075985; font-weight: bold; }
+        
+        /* Tab Styles */
+        .tab-btn { 
+            @apply px-4 py-2 text-sm font-medium border-b-2 border-transparent transition-all flex items-center gap-2; 
+        }
+        .tab-btn:hover { @apply bg-slate-50; }
+        
+        /* State: Active (Selected) */
+        .tab-btn.active { @apply border-corp-600 bg-blue-50/50; }
+        
+        /* State: Has Data (Uploaded) */
+        .tab-btn.has-data { @apply text-emerald-600; }
+        .tab-btn.has-data .status-icon { @apply inline-block; }
+        
+        /* State: No Data (Empty) */
+        .tab-btn.no-data { @apply text-slate-400; }
+        .tab-btn.no-data .status-icon { @apply hidden; }
+
+    </style>
+</head>
+<body class="bg-slate-100 h-screen overflow-hidden text-slate-800 flex">
+
+    <!-- Sidebar: History & Tools -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20">
+        <div class="p-4 border-b border-slate-100">
+            <h1 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-layer-group text-corp-600"></i> 日報管理系統
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">GitHub Page 版本</p>
+        </div>
+        
+        <div class="p-3">
+            <button onclick="createNewReport()" class="w-full bg-corp-600 hover:bg-corp-800 text-white py-2 px-4 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-plus"></i> 新增今日日報
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scroll px-3">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2 mt-2">歷史紀錄</h3>
+            <div id="historyList" class="space-y-1">
+                <!-- JS Populated -->
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 bg-slate-50">
+            <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">資料管理</h3>
+            <div class="flex gap-2">
+                <button onclick="exportData()" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition" title="匯出 JSON">
+                    <i class="fa-solid fa-download"></i> 備份
+                </button>
+                <label class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition text-center cursor-pointer" title="匯入 JSON">
+                    <i class="fa-solid fa-upload"></i> 還原
+                    <input type="file" id="importFile" class="hidden" onchange="importData(this)">
+                </label>
+            </div>
+            <button onclick="clearAllData()" class="w-full mt-2 text-rose-500 hover:text-rose-700 text-xs text-center underline">
+                清空所有資料
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+        
+        <!-- Toolbar Header -->
+        <header class="bg-white border-b border-slate-200 p-4 flex justify-between items-center shadow-sm z-10 shrink-0">
+            <div class="flex items-center gap-4">
+                <div class="flex flex-col">
+                    <label class="text-xs text-slate-500 font-bold uppercase">日報日期</label>
+                    <input type="date" id="reportDatePicker" class="font-bold text-lg text-slate-800 bg-transparent border-none p-0 focus:ring-0 cursor-pointer" onchange="handleDateChange()">
+                </div>
+                <div class="h-8 w-px bg-slate-200 mx-2"></div>
+                <div id="statusIndicator" class="text-sm text-slate-400 italic">
+                    <i class="fa-solid fa-circle-check text-emerald-500 mr-1 hidden" id="saveIcon"></i>
+                    <span id="saveText">準備就緒</span>
+                </div>
+                <div class="h-8 w-px bg-slate-200 mx-2"></div>
+                <div id="headerTotalManHours" class="text-sm bg-corp-100 text-corp-800 px-3 py-1 rounded-full font-medium">
+                    尚未計算
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="saveCurrentReport()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> 儲存所有變更
+                </button>
+                <button onclick="deleteCurrentReport()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-lg text-sm font-bold transition" title="刪除此日報">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-6 md:p-8 space-y-6 bg-slate-50">
+            
+            <!-- Editor / Input (Collapsible) -->
+            <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-0 transition-all duration-300 overflow-hidden" id="inputSectionCard">
+                <!-- Header with Tabs -->
+                <div class="bg-slate-50 border-b border-slate-200 px-6 pt-4 flex flex-col gap-4">
+                    <div class="flex justify-between items-center">
+                        <label class="font-bold text-slate-700 flex items-center gap-2">
+                            <i class="fa-regular fa-keyboard"></i> 原始資料輸入 (OLD_TS)
+                        </label>
+                        <!-- Tools -->
+                        <div class="flex gap-2" id="inputTools">
+                            <button onclick="parseData()" class="text-sm bg-corp-600 hover:bg-corp-700 text-white px-3 py-1 rounded transition">
+                                <i class="fa-solid fa-rotate"></i> 重新分析
+                            </button>
+                            <button id="btnLoadDemo" onclick="loadDemo()" class="text-xs text-slate-400 hover:text-corp-600 underline">
+                                載入範例
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab Navigation -->
+                    <div class="flex space-x-1" id="tabContainer">
+                        <button onclick="switchTab('ALL')" id="tab-ALL" class="tab-btn">
+                            <i class="fa-solid fa-list"></i> 全部總覽
+                        </button>
+                        <button onclick="switchTab('QA')" id="tab-QA" class="tab-btn no-data">
+                            品檢組 <i class="fa-solid fa-check-circle status-icon"></i>
+                        </button>
+                        <button onclick="switchTab('CS')" id="tab-CS" class="tab-btn no-data">
+                            客服組 <i class="fa-solid fa-check-circle status-icon"></i>
+                        </button>
+                        <button onclick="switchTab('WEB')" id="tab-WEB" class="tab-btn no-data">
+                            網頁組 <i class="fa-solid fa-check-circle status-icon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Area (Hidden when collapsed) -->
+                <div id="inputAreaContainer" class="p-6">
+                    <!-- Textarea for inputting data (Hidden on ALL tab) -->
+                    <textarea id="rawInput" class="w-full h-40 p-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-corp-600 focus:border-transparent font-mono text-sm bg-white shadow-inner resize-y placeholder-slate-400" placeholder="在此貼上日報內容..." oninput="handleInputUpdate()"></textarea>
+                    
+                    <!-- Read-only View for ALL tab -->
+                    <div id="allView" class="hidden w-full h-40 p-4 border border-slate-200 rounded-lg bg-slate-50 overflow-y-auto text-sm font-mono text-slate-500 whitespace-pre-wrap"></div>
+                </div>
+
+                <!-- Re-open Button -->
+                <div class="px-6 pb-6 hidden" id="reeditBtnContainer">
+                    <button onclick="toggleInput(true)" class="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:text-corp-600 hover:bg-corp-50 hover:border-corp-300 font-bold text-sm transition flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-pen-to-square group-hover:scale-110 transition-transform"></i> 
+                        資料已隱藏，點擊展開進行編輯
+                    </button>
+                </div>
+            </section>
+
+            <!-- Dashboard Widgets -->
+            <div id="analysisSection" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Work Hours Chart -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                        <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-2">
+                            <i class="fa-solid fa-clock"></i>
+                        </span>
+                        工時統計
+                        <span id="widgetTotalManHours" class="ml-auto text-xs bg-slate-100 px-2 py-1 rounded-full font-normal text-slate-500"></span>
+                    </h3>
+                    <div class="overflow-y-auto custom-scroll max-h-[250px]">
+                        <table class="w-full text-sm">
+                            <tbody id="hoursTableBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Leave Details -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                        <span class="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center mr-2">
+                            <i class="fa-solid fa-clipboard-user"></i>
+                        </span>
+                        請假 / 未出勤明細
+                    </h3>
+                    <div id="leaveListContainer" class="flex-1 overflow-y-auto custom-scroll max-h-[250px]"></div>
+                </div>
+            </div>
+
+            <!-- Detail List & Export -->
+            <section id="resultSection" class="hidden space-y-4">
+                <div class="flex justify-between items-end border-b border-slate-200 pb-2">
+                    <h3 class="font-bold text-slate-700 text-lg">
+                        <i class="fa-solid fa-list-check text-slate-400 mr-2"></i> 彙整結果
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="copyToClipboard('text')" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-xs rounded shadow transition">
+                            <i class="fa-brands fa-line"></i> 複製純文字
+                        </button>
+                        <button onclick="copyToClipboard('html')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded shadow transition font-bold">
+                            <i class="fa-solid fa-envelope"></i> 複製到 Email
+                        </button>
+                    </div>
+                </div>
+                <div id="detailView" class="space-y-4"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
+
+    <script>
+        // --- STORAGE & STATE MANAGER ---
+        const DB_KEY = 'daily_reports_db_v3_tabbed'; 
+        let currentReportDate = '';
+        
+        // Data Model
+        let currentDailyData = {
+            QA: '',
+            CS: '',
+            WEB: ''
+        };
+        let activeTab = 'QA';
+        let parsedData = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            updateHistoryList();
+            loadReportByDate(today);
+        });
+
+        function getDB() {
+            const data = localStorage.getItem(DB_KEY);
+            return data ? JSON.parse(data) : {};
+        }
+
+        function saveDB(data) {
+            localStorage.setItem(DB_KEY, JSON.stringify(data));
+            updateHistoryList();
+        }
+
+        // --- TAB LOGIC ---
+        function updateTabUI() {
+            // Check status of each group and update UI colors
+            ['QA', 'CS', 'WEB'].forEach(group => {
+                const btn = document.getElementById(`tab-${group}`);
+                const hasData = currentDailyData[group] && currentDailyData[group].trim().length > 0;
+                
+                if (hasData) {
+                    btn.classList.add('has-data');
+                    btn.classList.remove('no-data');
+                } else {
+                    btn.classList.add('no-data');
+                    btn.classList.remove('has-data');
+                }
+            });
+        }
+
+        function switchTab(tab) {
+            // Update UI Active State
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            
+            activeTab = tab;
+            const textarea = document.getElementById('rawInput');
+            const allView = document.getElementById('allView');
+            const demoBtn = document.getElementById('btnLoadDemo');
+
+            if (tab === 'ALL') {
+                textarea.classList.add('hidden');
+                allView.classList.remove('hidden');
+                demoBtn.classList.add('hidden'); // Hide Demo button in ALL view
+                
+                // Aggregate text for preview
+                let previewText = '';
+                
+                ['QA', 'CS', 'WEB'].forEach(group => {
+                    const content = currentDailyData[group];
+                    if(content && content.trim().length > 0) {
+                        previewText += `=== 【${getGroupName(group)}】 ===\n${content}\n\n`;
+                    }
+                });
+                
+                allView.innerText = previewText || "(尚無資料，請切換至各組別輸入日報)";
+                
+                // When switching to ALL, force a re-parse to ensure dashboard is up to date
+                parseData(false);
+
+            } else {
+                textarea.classList.remove('hidden');
+                allView.classList.add('hidden');
+                demoBtn.classList.remove('hidden');
+                
+                // Set textarea value to current group's data
+                textarea.value = currentDailyData[tab] || '';
+                textarea.placeholder = `在此貼上【${getGroupName(tab)}】的 OLD_TS 原始資料...`;
+                textarea.focus();
+            }
+        }
+
+        function getGroupName(code) {
+            const map = { 'QA': '品檢組', 'CS': '客服組', 'WEB': '網頁組', 'ALL': '全部總覽' };
+            return map[code] || code;
+        }
+
+        function handleInputUpdate() {
+            if (activeTab === 'ALL') return;
+            const val = document.getElementById('rawInput').value;
+            currentDailyData[activeTab] = val;
+            updateTabUI(); // Update color status in real-time
+        }
+
+        // --- HISTORY LIST ---
+        function updateHistoryList() {
+            const db = getDB();
+            const dates = Object.keys(db).sort().reverse(); 
+            const listEl = document.getElementById('historyList');
+            listEl.innerHTML = '';
+
+            if(dates.length === 0) {
+                listEl.innerHTML = '<div class="text-xs text-slate-400 p-2 text-center">尚無紀錄</div>';
+                return;
+            }
+
+            dates.forEach(date => {
+                const item = document.createElement('div');
+                item.className = `p-2 rounded cursor-pointer text-sm flex justify-between items-center hover:bg-slate-50 transition ${date === currentReportDate ? 'active-date' : 'text-slate-600'}`;
+                item.onclick = () => loadReportByDate(date);
+                item.innerHTML = `
+                    <span><i class="fa-regular fa-calendar mr-2 opacity-50"></i>${date}</span>
+                    <i class="fa-solid fa-chevron-right text-xs opacity-30"></i>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        // --- MAIN ACTIONS ---
+        function toggleInput(expand) {
+            const inputArea = document.getElementById('inputAreaContainer');
+            const tools = document.getElementById('inputTools');
+            const btnContainer = document.getElementById('reeditBtnContainer');
+            
+            if(expand) {
+                inputArea.classList.remove('hidden');
+                tools.classList.remove('hidden');
+                btnContainer.classList.add('hidden');
+            } else {
+                inputArea.classList.add('hidden');
+                tools.classList.add('hidden');
+                btnContainer.classList.remove('hidden');
+            }
+        }
+
+        function loadReportByDate(date) {
+            currentReportDate = date;
+            document.getElementById('reportDatePicker').value = date;
+            updateHistoryList();
+
+            const db = getDB();
+            let data = db[date];
+
+            // Migration / Reset Logic
+            if (!data) {
+                // New Day
+                currentDailyData = { QA: '', CS: '', WEB: '' };
+                switchTab('QA'); // Reset view to QA
+                clearViews();
+                showSaveStatus('新文件', false);
+                toggleInput(true);
+            } else {
+                // Compatibility check
+                if (typeof data === 'string') {
+                    // Old version migration
+                    currentDailyData = { QA: data, CS: '', WEB: '' };
+                } else {
+                    currentDailyData = { ...data };
+                }
+                
+                updateTabUI(); // Set colors
+                parseData(false);
+                showSaveStatus('已讀取', false);
+                toggleInput(false); // Collapse
+                switchTab('ALL'); // Show Summary by default
+            }
+        }
+
+        function clearViews() {
+            document.getElementById('rawInput').value = '';
+            document.getElementById('allView').innerText = '';
+            document.getElementById('analysisSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('headerTotalManHours').innerText = "尚未計算";
+            updateTabUI();
+        }
+
+        function createNewReport() {
+            const today = new Date().toISOString().split('T')[0];
+            loadReportByDate(today);
+            toggleInput(true);
+            switchTab('QA');
+        }
+
+        function handleDateChange() {
+            const newDate = document.getElementById('reportDatePicker').value;
+            if(newDate) loadReportByDate(newDate);
+        }
+
+        function saveCurrentReport() {
+            const date = document.getElementById('reportDatePicker').value;
+            if(!date) return showToast('請選擇日期');
+
+            const db = getDB();
+            db[date] = currentDailyData; 
+            saveDB(db);
+            
+            showSaveStatus('已儲存', true);
+            showToast('資料已儲存');
+            updateTabUI();
+            
+            const hasData = Object.values(currentDailyData).some(str => str && str.trim().length > 0);
+            
+            if(hasData) {
+                parseData(false);
+                toggleInput(false);
+            }
+        }
+
+        function deleteCurrentReport() {
+            if(!confirm('確定要刪除這天的日報嗎？無法復原。')) return;
+            const db = getDB();
+            delete db[currentReportDate];
+            saveDB(db);
+            loadReportByDate(new Date().toISOString().split('T')[0]);
+            showToast('已刪除');
+        }
+
+        function showSaveStatus(msg, isSuccess) {
+            const el = document.getElementById('statusIndicator');
+            const icon = document.getElementById('saveIcon');
+            const text = document.getElementById('saveText');
+            text.innerText = msg;
+            if(isSuccess) {
+                icon.classList.remove('hidden');
+                setTimeout(() => icon.classList.add('hidden'), 2000);
+            } else {
+                icon.classList.add('hidden');
+            }
+        }
+
+        // --- PARSING LOGIC ---
+        function loadDemo() {
+            const demoText = `專案議題回應小時  OLD_TS品檢呂孟軒 4 小時: 8.00 全部摺疊/全部展開【品檢組】網頁組測試 #221233: [智能行銷]20251211版更品檢測試測試項目數：11｜問題回報：7｜測試內容：開案、展表、介面功能驗證、與窗口討論測試內容、確認規格｜3.50編輯 刪除 動作`;
+            
+            if (activeTab === 'ALL') {
+                alert("請先切換至特定組別 (如：品檢組) 再載入範例");
+                return;
+            }
+            
+            currentDailyData[activeTab] = demoText;
+            document.getElementById('rawInput').value = demoText;
+            updateTabUI();
+            saveCurrentReport(); 
+        }
+
+        function parseData(scroll = true) {
+            // Aggregate ALL data for parsing
+            const raw = [currentDailyData.QA, currentDailyData.CS, currentDailyData.WEB]
+                .join('\n'); 
+
+            if (!raw.trim()) {
+                clearViews();
+                return;
+            }
+
+            parsedData = [];
+            let totalTeamHours = 0;
+
+            const rawPeople = raw.split('OLD_TS').filter(item => item.trim().length > 0);
+
+            rawPeople.forEach(personBlock => {
+                const headerMatch = personBlock.match(/^\s*(.+?)[\s\d]+小時:\s*([\d\.]+)/);
+                if (headerMatch) {
+                    let name = headerMatch[1].trim(); 
+                    if (name.startsWith('品檢')) name = name.substring(2);
+
+                    const totalHours = parseFloat(headerMatch[2]);
+                    totalTeamHours += totalHours;
+
+                    let taskString = personBlock.replace(headerMatch[0], '').replace(/全部摺疊\/全部展開/g, '');
+                    const rawTasks = taskString.split(/編輯\s+刪除\s+動作/);
+                    const tasks = [];
+
+                    rawTasks.forEach(t => {
+                        t = t.trim();
+                        if (t.length === 0) return;
+                        const idMatch = t.match(/#(\d+)/);
+                        const id = idMatch ? idMatch[1] : '';
+                        let project = '其他';
+                        if (t.includes('】') && t.includes('#')) {
+                            const match = t.match(/】(.*?)#/);
+                            if (match) project = match[1].trim();
+                        } else if (t.includes('#')) {
+                            project = t.split('#')[0].replace(/【.*?】/g, '').trim();
+                        } else if (t.includes('【')) {
+                             const match = t.match(/【(.*?)】/);
+                             if(match) project = match[1];
+                        }
+                        project = project.replace(/測試|支援|功能/g, '').trim();
+                        const hoursMatch = t.match(/(\d+\.\d+)$/);
+                        const taskHours = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
+                        let content = t;
+                        let category = '';
+                        if (idMatch) {
+                            const parts = t.split('#' + id);
+                            if (parts[1]) {
+                                let rightSide = parts[1];
+                                if (hoursMatch) rightSide = rightSide.substring(0, rightSide.lastIndexOf(hoursMatch[0]));
+                                rightSide = rightSide.trim();
+                                if (rightSide.startsWith(':')) rightSide = rightSide.substring(1).trim();
+                                const contentStartRegex = /(測試項目數|回報問題數|測試內容|問題回報|回報問題)/;
+                                const splitMatch = rightSide.search(contentStartRegex);
+                                if (splitMatch !== -1) {
+                                    category = rightSide.substring(0, splitMatch).trim();
+                                    content = rightSide.substring(splitMatch).trim();
+                                } else {
+                                    category = rightSide; content = '';
+                                }
+                                if (category.endsWith('｜')) category = category.slice(0, -1).trim();
+                            }
+                        }
+                        tasks.push({ project, category, id, content, hours: taskHours });
+                    });
+                    parsedData.push({ name, totalHours, tasks });
+                }
+            });
+
+            if (parsedData.length === 0) {
+                return;
+            }
+
+            const statsText = `${parsedData.length}人 / ${totalTeamHours.toFixed(1)}hr`;
+            document.getElementById('headerTotalManHours').innerText = statsText;
+            document.getElementById('widgetTotalManHours').innerText = statsText;
+            
+            renderDashboard();
+            renderDetailView();
+            
+            document.getElementById('analysisSection').classList.remove('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+            
+            if(scroll) {
+                document.getElementById('analysisSection').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // --- RENDERERS ---
+        function renderDashboard() {
+            const tbody = document.getElementById('hoursTableBody');
+            tbody.innerHTML = '';
+            const sortedData = [...parsedData].sort((a,b) => b.totalHours - a.totalHours);
+
+            let rows = '';
+            sortedData.forEach(p => {
+                let barColor = 'bg-emerald-500';
+                let hoursClass = 'text-emerald-700';
+                if (p.totalHours < 8) { barColor = 'bg-amber-400'; hoursClass = 'text-amber-700'; }
+                else if (p.totalHours > 10) { barColor = 'bg-rose-500'; hoursClass = 'text-rose-700'; }
+                let width = Math.min((p.totalHours / 12) * 100, 100);
+
+                rows += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-2 font-medium text-slate-700 text-xs">${p.name}</td>
+                        <td class="p-2 align-middle">
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="${barColor} h-2 rounded-full" style="width: ${width}%"></div>
+                            </div>
+                        </td>
+                        <td class="p-2 text-right font-bold font-mono text-xs ${hoursClass}">${p.totalHours.toFixed(1)}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+
+            const leaveContainer = document.getElementById('leaveListContainer');
+            let hasLeave = false;
+            let leaveHtml = `<ul class="space-y-3">`;
+
+            parsedData.forEach(p => {
+                p.tasks.forEach(t => {
+                    if (t.category.includes('請假') || t.content.includes('請假') || t.category.includes('特休') || t.category.includes('事假') || t.category.includes('病假')) {
+                        hasLeave = true;
+                        leaveHtml += `
+                            <li class="flex items-start bg-rose-50 border border-rose-100 p-2 rounded-lg">
+                                <div class="bg-rose-200 text-rose-700 rounded-full w-6 h-6 flex items-center justify-center shrink-0 mr-2 font-bold text-[10px]">${p.name[0]}</div>
+                                <div>
+                                    <div class="font-bold text-slate-800 text-xs">${p.name}</div>
+                                    <div class="text-xs text-rose-600 font-medium mt-0.5">${t.category.replace('請假', '')}</div>
+                                    <div class="text-[10px] text-slate-500 font-mono inline-block">${t.hours} hr</div>
+                                </div>
+                            </li>
+                        `;
+                    }
+                });
+            });
+            leaveHtml += `</ul>`;
+            leaveContainer.innerHTML = hasLeave ? leaveHtml : `<div class="flex flex-col items-center justify-center h-full text-slate-400 py-4"><i class="fa-regular fa-calendar-check text-2xl mb-1 text-emerald-100"></i><p class="text-xs">全員出勤</p></div>`;
+        }
+
+        function formatContentForWeb(text) {
+            if (!text) return '';
+            const segments = text.split(/[｜|]/);
+            return segments.map(seg => {
+                seg = seg.trim();
+                if (!seg) return '';
+                if (seg.includes('項目數') || seg.includes('回報問題數')) {
+                    const num = seg.match(/\d+/);
+                    const n = num ? parseInt(num[0]) : 0;
+                    const colorClass = n > 0 ? 'bg-red-50 text-red-600 ring-1 ring-red-200' : 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200';
+                    return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${colorClass} mr-2 mb-1">${seg}</span>`;
+                }
+                if (seg.includes('測試內容') || seg.includes('工作事項')) {
+                     return `<div class="mt-1 block text-slate-600 text-xs"><span class="font-bold text-slate-700">${seg.split('：')[0]}：</span>${seg.split('：')[1] || ''}</div>`;
+                }
+                return `<span class="mr-2 text-slate-700">${seg}</span>`;
+            }).join('');
+        }
+
+        function renderDetailView() {
+            const container = document.getElementById('detailView');
+            container.innerHTML = '';
+            parsedData.forEach(p => {
+                let hoursColor = 'bg-emerald-100 text-emerald-800';
+                if (p.totalHours < 8) hoursColor = 'bg-amber-100 text-amber-800';
+                if (p.totalHours > 10) hoursColor = 'bg-rose-100 text-rose-800';
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden';
+                let tasksHtml = p.tasks.map(t => `
+                    <div class="border-b border-slate-100 last:border-0 pb-3 mb-3 last:mb-0 last:pb-0">
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1">
+                            <span class="bg-corp-50 text-corp-600 border border-corp-100 text-[10px] font-bold px-1.5 py-0.5 rounded">${t.project}</span>
+                            <span class="text-xs font-mono text-slate-400">#${t.id}</span>
+                            <span class="text-xs font-bold text-slate-800 flex-1">${t.category}</span>
+                            <span class="text-xs font-bold text-slate-600 font-mono">: ${t.hours}hr</span>
+                        </div>
+                        <div class="text-xs leading-relaxed pl-1">${formatContentForWeb(t.content)}</div>
+                    </div>
+                `).join('');
+
+                card.innerHTML = `
+                    <div class="p-3 md:w-28 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 shrink-0">
+                        <div class="font-bold text-sm text-slate-800">${p.name}</div>
+                        <div class="px-2 py-0.5 rounded-full text-[10px] font-bold ${hoursColor}">${p.totalHours.toFixed(1)}h</div>
+                    </div>
+                    <div class="p-4 flex-1 bg-white">${tasksHtml}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // --- EXPORT/IMPORT & COPY ---
+        function exportData() {
+            const db = getDB();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `daily_reports_backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    const currentDB = getDB();
+                    const newDB = { ...currentDB, ...json };
+                    saveDB(newDB);
+                    alert('資料匯入成功！');
+                    loadReportByDate(currentReportDate);
+                } catch(err) { alert('匯入失敗：檔案格式錯誤'); }
+            };
+            reader.readAsText(file);
+            input.value = ''; 
+        }
+        
+        function clearAllData() {
+            if(confirm('警告：這將清空所有紀錄！建議先備份。')) {
+                localStorage.removeItem(DB_KEY);
+                updateHistoryList();
+                createNewReport();
+                showToast('已清空');
+            }
+        }
+
+        async function copyToClipboard(type) {
+            let content = '';
+            const dateStr = document.getElementById('reportDatePicker').value;
+            if (type === 'text') {
+                content += `📅 ${dateStr}\n\n`;
+                parsedData.forEach(p => {
+                    content += `👤 ${p.name} (總計: ${p.totalHours}hr)\n`;
+                    p.tasks.forEach(t => {
+                        content += `  ${t.project}  #${t.id}  ${t.category}    : ${t.hours}hr\n`;
+                        const segments = t.content.split(/[｜|]/);
+                        segments.forEach(seg => { seg = seg.trim(); if (seg) content += `  ${seg}\n`; });
+                        content += `\n`; 
+                    });
+                    content += `----------------------------------------\n`;
+                });
+            } else {
+                let rows = '';
+                parsedData.forEach((p, index) => {
+                    let taskRows = p.tasks.map(t => {
+                        let cleanContent = t.content.split(/[｜|]/).map(seg => {
+                            seg = seg.trim(); if(!seg) return '';
+                            if (seg.includes('項目數') || seg.includes('回報問題數')) {
+                                let color = seg.includes('回報問題數') && seg.match(/\d+/) && parseInt(seg.match(/\d+/)[0]) > 0 ? '#d32f2f' : '#2e7d32'; 
+                                return `<span style="color:${color}; font-weight:bold; margin-right:8px;">${seg}</span>`;
+                            }
+                            if (seg.includes('測試內容')) return `<div style="color:#555; margin-top:2px;">${seg}</div>`;
+                            return `<span style="margin-right:8px;">${seg}</span>`;
+                        }).join('');
+                        return `<div style="margin-bottom:12px; padding-bottom:8px; border-bottom:1px dashed #e0e0e0;">
+                                <div style="margin-bottom:4px; font-family:sans-serif;">
+                                    <span style="background:#e3f2fd; color:#1565c0; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; margin-right:6px;">${t.project}</span>
+                                    <span style="color:#888; font-size:12px; font-family:monospace; margin-right:6px;">#${t.id}</span>
+                                    <span style="color:#2c3e50; font-weight:bold; font-size:13px;">${t.category}</span>
+                                    <span style="float:right; color:#444; font-weight:bold; font-size:12px;">: ${t.hours}hr</span>
+                                </div>
+                                <div style="font-size:13px; color:#333; line-height:1.5; padding-left:4px;">${cleanContent}</div>
+                            </div>`;
+                    }).join('');
+                    let bg = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                    rows += `<tr style="background-color:${bg};">
+                            <td style="padding:15px; border-bottom:1px solid #ddd; vertical-align:top; width:100px; text-align:center;">
+                                <div style="font-size:16px; font-weight:bold; color:#2c3e50; margin-bottom:5px;">${p.name}</div>
+                                <div style="display:inline-block; padding:3px 8px; background:#eee; border-radius:12px; font-size:12px; font-weight:bold; color:#555;">${p.totalHours}h</div>
+                            </td>
+                            <td style="padding:15px; border-bottom:1px solid #ddd; vertical-align:top;">${taskRows}</td>
+                        </tr>`;
+                });
+                content = `<div style="font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width:900px; margin:0 auto; color:#333;">
+                        <h3 style="color:#1565c0; border-bottom:2px solid #1565c0; padding-bottom:10px; margin-bottom:0;">${dateStr} 工作日報彙整</h3>
+                        <div style="font-size:12px; color:#666; margin-bottom:15px; text-align:right;">總人力: ${parsedData.length} 人</div>
+                        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                            <thead style="background-color:#f1f5f9;"><tr><th style="padding:10px; text-align:center; border-bottom:2px solid #ddd; color:#555;">人員</th><th style="padding:10px; text-align:left; border-bottom:2px solid #ddd; color:#555;">工作內容詳情</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                        <div style="text-align:center; font-size:12px; color:#aaa; margin-top:20px; border-top:1px solid #eee; padding-top:10px;">Generated by Daily Report Assistant</div>
+                    </div>`;
+            }
+            try {
+                if (type === 'text') await navigator.clipboard.writeText(content);
+                else await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([content], { type: 'text/html' }) })]);
+                showToast(type === 'text' ? "純文字報告已複製！" : "Email 格式表格已複製！");
+            } catch (err) { fallbackCopy(content, type); }
+        }
+
+        function fallbackCopy(content, type) {
+            const el = document.createElement(type === 'text' ? 'textarea' : 'div');
+            if(type === 'text') el.value = content; else el.innerHTML = content;
+            el.style.position = 'fixed'; el.style.left = '-9999px';
+            document.body.appendChild(el);
+            if(type !== 'text') { const range = document.createRange(); range.selectNode(el); window.getSelection().addRange(range); }
+            else el.select();
+            try { document.execCommand('copy'); showToast("已複製 (Fallback)！"); } catch(e) { showToast("複製失敗"); }
+            document.body.removeChild(el);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
