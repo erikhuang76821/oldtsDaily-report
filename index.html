@@ -93,7 +93,7 @@
         
         <div class="p-3">
             <button onclick="createNewReport()" class="w-full bg-corp-600 hover:bg-corp-800 text-white py-2 px-4 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-plus"></i> 新增今日日報
+                <i class="fa-solid fa-plus"></i> 切換到當日
             </button>
         </div>
 
@@ -174,7 +174,7 @@
                     <div class="w-px h-4 bg-slate-200 mx-1 shrink-0"></div>
 
                     <button onclick="switchTab('DB')" id="tab-DB" class="header-tab-btn no-data">
-                        <span class="data-dot"></span> 資料庫
+                        <span class="data-dot"></span> DB
                     </button>
                 </div>
             </div>
@@ -211,10 +211,17 @@
                             <span id="inputLabelGroup">原始資料輸入</span> 
                         </label>
                         
-                        <!-- Redmine Source Toggle (QA Only) -->
+                        <!-- Redmine / Google Sheet Source Toggle (QA Only) -->
                         <div id="qaSourceToggle" class="hidden flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-                            <button onclick="setQaInputMode('MANUAL')" id="btn-mode-manual" class="px-3 py-1 text-xs font-bold rounded-md transition-all bg-white text-corp-600 shadow-sm">手動輸入</button>
-                            <button onclick="setQaInputMode('REDMINE')" id="btn-mode-redmine" class="px-3 py-1 text-xs font-bold rounded-md transition-all text-slate-500 hover:text-slate-700">Redmine</button>
+                            <button onclick="setQaInputMode('MANUAL')" id="btn-qa-mode-manual" class="px-3 py-1 text-xs font-bold rounded-md transition-all bg-white text-corp-600 shadow-sm">手動輸入</button>
+                            <button onclick="setQaInputMode('REDMINE')" id="btn-qa-mode-redmine" class="px-3 py-1 text-xs font-bold rounded-md transition-all text-slate-500 hover:text-slate-700">Redmine</button>
+                            <button onclick="setQaInputMode('GSHEET')" id="btn-qa-mode-gsheet" class="px-3 py-1 text-xs font-bold rounded-md transition-all text-slate-500 hover:text-slate-700"><i class="fa-brands fa-google mr-1"></i>Sheet</button>
+                        </div>
+
+                        <!-- CS Leave Toggle (CS Only) -->
+                        <div id="csSourceToggle" class="hidden flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                            <button onclick="setCsInputMode('MANUAL')" id="btn-cs-mode-manual" class="px-3 py-1 text-xs font-bold rounded-md transition-all bg-white text-corp-600 shadow-sm">手動輸入</button>
+                            <button onclick="setCsInputMode('LEAVE')" id="btn-cs-mode-leave" class="px-3 py-1 text-xs font-bold rounded-md transition-all text-slate-500 hover:text-slate-700"><i class="fa-solid fa-mug-hot mr-1"></i>請假填寫</button>
                         </div>
                     </div>
                     
@@ -235,7 +242,7 @@
                     <!-- Manual Textarea -->
                     <textarea id="rawInput" class="w-full h-48 p-4 border-none focus:ring-0 font-mono text-sm bg-white resize-y placeholder-slate-300 outline-none" placeholder="在此貼上日報內容..." oninput="handleInputUpdate()"></textarea>
                     
-                    <!-- Redmine Importer UI (Hidden by default) -->
+                    <!-- Redmine Importer UI (QA Only) -->
                     <div id="redmineImporter" class="hidden w-full h-48 p-4 bg-slate-50 flex flex-col gap-3 overflow-y-auto">
                          <div class="flex flex-wrap items-center gap-2 mb-2">
                              <span class="text-xs font-bold text-slate-600 uppercase bg-slate-200 px-2 py-1 rounded">API 設定</span>
@@ -255,14 +262,87 @@
                                  </div>
                              </div>
                          </div>
-                         
-                         <!-- Status Messages -->
                          <div id="fetchStatusMsg" class="hidden mt-2 p-2 rounded text-xs"></div>
-
                          <div class="text-[10px] text-slate-400 mt-auto pt-2 border-t border-slate-200">
                              資料來源: https://igs.redmine-x.com/time_entries.json
                          </div>
                     </div>
+
+                    <!-- Google Sheet Importer UI (QA Only) -->
+                    <div id="gsheetImporter" class="hidden w-full h-48 p-4 bg-green-50/50 flex flex-col gap-3 overflow-y-auto">
+                        <div class="flex flex-wrap items-center gap-2 mb-2 justify-between">
+                            <span class="text-xs font-bold text-green-700 uppercase bg-green-100 px-2 py-1 rounded">Google Sheet 設定</span>
+                            <span class="text-[10px] text-slate-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i>需將試算表權限設為「知道連結者皆可檢視」</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">Google Sheet ID (試算表 ID)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="gsheetId" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-green-600 transition" value="168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo" placeholder="例如: 168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo">
+                                    <button onclick="fetchGoogleSheetData()" id="btnFetchGSheet" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-xs font-bold shadow transition whitespace-nowrap">
+                                        <i class="fa-brands fa-google mr-1"></i> 匯入資料
+                                    </button>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1 truncate">
+                                    連結格式: https://docs.google.com/spreadsheets/d/<strong>{ID}</strong>/edit...
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Column Mapping (Collapsed / Small) -->
+                        <div class="border-t border-green-200 pt-2 mt-1">
+                            <div class="text-[10px] font-bold text-slate-400 mb-1">欄位對應 (Column Index: A=0, B=1, ...)</div>
+                            <div class="flex gap-2 overflow-x-auto pb-1">
+                                <input type="number" id="colDate" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="Date" value="0" title="日期 (A)">
+                                <input type="number" id="colName" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="Name" value="1" title="姓名 (B)">
+                                <input type="number" id="colProj" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="Proj" value="2" title="專案 (C)">
+                                <input type="number" id="colId" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="ID" value="3" title="議題ID (D)">
+                                <input type="number" id="colCat" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="Cat" value="3" title="類別 (E)">
+                                <input type="number" id="colContent" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="Cont" value="4" title="內容 (F)">
+                                <input type="number" id="colHours" class="w-12 border rounded px-1 text-[10px] text-center" placeholder="Hrs" value="5" title="工時 (G)">
+                            </div>
+                        </div>
+
+                        <div id="gsheetStatusMsg" class="hidden mt-1 p-2 rounded text-xs"></div>
+                   </div>
+
+                    <!-- CS Leave Importer UI (CS Only) -->
+                    <div id="csLeaveImporter" class="hidden w-full h-48 bg-orange-50/30 flex flex-col overflow-hidden relative">
+                        <!-- Input Row -->
+                        <div class="p-4 pb-2 shrink-0">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-xs font-bold text-orange-600 uppercase bg-orange-100 px-2 py-1 rounded">請假登錄</span>
+                                <span class="text-[10px] text-orange-400">登錄後的資料僅會顯示在右下角的「請假/未出勤明細」，不會合併到總覽列表。</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">姓名</label>
+                                    <input type="text" id="csLeaveName" class="w-full border border-slate-300 rounded px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-orange-500 transition" placeholder="例如: 王小明">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">請假事由</label>
+                                    <input type="text" id="csLeaveReason" class="w-full border border-slate-300 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-orange-500 transition" placeholder="例如: 病假 / 特休">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">時數</label>
+                                    <div class="flex gap-2">
+                                        <input type="number" id="csLeaveHours" class="flex-1 border border-slate-300 rounded px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-orange-500 transition" placeholder="8" step="0.5">
+                                        <button onclick="addCsLeave()" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition whitespace-nowrap">
+                                            <i class="fa-solid fa-plus mr-1"></i> 新增
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Added List -->
+                        <div class="flex-1 overflow-y-auto custom-scroll px-4 pb-4">
+                            <div id="csLeaveListDisplay" class="space-y-1">
+                                <!-- Populated via JS -->
+                            </div>
+                        </div>
+                   </div>
+
                 </div>
             </section>
 
@@ -320,17 +400,21 @@
         // Data Model Definitions
         const ALL_GROUPS = ['TECH', 'QA', 'CS', 'WEB', 'ART', 'DB'];
         
+        // currentDailyData structure updated to include separate leaves array
+        // { TECH: '', ..., leaves: [ {id, group, name, reason, hours} ] }
         let currentDailyData = {
             TECH: '',
             QA: '',
             CS: '',
             WEB: '',
             ART: '',
-            DB: ''
+            DB: '',
+            leaves: [] 
         };
         let activeTab = 'ALL'; // Default to ALL
         let parsedData = [];
-        let qaInputMode = 'MANUAL'; // 'MANUAL' or 'REDMINE'
+        let qaInputMode = 'MANUAL'; // 'MANUAL', 'REDMINE', 'GSHEET'
+        let csInputMode = 'MANUAL'; // 'MANUAL' or 'LEAVE'
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -430,7 +514,9 @@
             const textarea = document.getElementById('rawInput');
             const labelGroup = document.getElementById('inputLabelGroup');
             const titleSuffix = document.getElementById('resultSectionTitleSuffix');
+            
             const qaSourceToggle = document.getElementById('qaSourceToggle');
+            const csSourceToggle = document.getElementById('csSourceToggle');
             const inputTools = document.getElementById('inputTools');
 
             if (tab === 'ALL') {
@@ -453,25 +539,35 @@
                 textarea.value = currentDailyData[tab] || '';
                 textarea.placeholder = `在此貼上【${getGroupName(tab)}】的 OLD_TS 原始資料...`;
 
-                // QA Specific UI Logic
+                // --- Toggle Logic for QA and CS ---
+                qaSourceToggle.classList.add('hidden');
+                csSourceToggle.classList.add('hidden');
+                
+                // Default visibility reset
+                document.getElementById('rawInput').classList.remove('hidden');
+                document.getElementById('redmineImporter').classList.add('hidden');
+                document.getElementById('gsheetImporter').classList.add('hidden');
+                document.getElementById('csLeaveImporter').classList.add('hidden');
+                inputTools.classList.remove('hidden');
+
                 if (tab === 'QA') {
                     qaSourceToggle.classList.remove('hidden');
-                    // Reset to manual when switching tabs initially or keep state? Let's reset for consistency unless already in QA
-                    // updateQaInputModeUI(); // Call this to ensure correct visibility
-                } else {
-                    qaSourceToggle.classList.add('hidden');
-                    // Force Manual Mode for other tabs UI-wise (hide Redmine panel)
-                    document.getElementById('rawInput').classList.remove('hidden');
-                    document.getElementById('redmineImporter').classList.add('hidden');
-                    inputTools.classList.remove('hidden');
+                    updateQaInputModeUI(); // Restore state
+                } else if (tab === 'CS') {
+                    csSourceToggle.classList.remove('hidden');
+                    updateCsInputModeUI(); // Restore state
                 }
                 
                 // Trigger parseData again to filter the view ONLY for this tab
                 parseData(false);
                 
                 // Focus slightly delayed to allow UI update
-                if(tab !== 'QA' || qaInputMode === 'MANUAL') {
+                if(tab !== 'QA' && tab !== 'CS') {
                     setTimeout(() => textarea.focus(), 50);
+                } else {
+                    // Logic to focus based on mode
+                    if(tab === 'QA' && qaInputMode === 'MANUAL') setTimeout(() => textarea.focus(), 50);
+                    if(tab === 'CS' && csInputMode === 'MANUAL') setTimeout(() => textarea.focus(), 50);
                 }
             }
         }
@@ -483,50 +579,347 @@
         }
 
         function updateQaInputModeUI() {
-            const btnManual = document.getElementById('btn-mode-manual');
-            const btnRedmine = document.getElementById('btn-mode-redmine');
+            const btnManual = document.getElementById('btn-qa-mode-manual');
+            const btnRedmine = document.getElementById('btn-qa-mode-redmine');
+            const btnGSheet = document.getElementById('btn-qa-mode-gsheet');
+            
             const rawInput = document.getElementById('rawInput');
             const redmineImporter = document.getElementById('redmineImporter');
+            const gsheetImporter = document.getElementById('gsheetImporter');
             const inputTools = document.getElementById('inputTools');
+
+            // Reset buttons
+            [btnManual, btnRedmine, btnGSheet].forEach(btn => {
+                btn.classList.remove('bg-white', 'text-corp-600', 'shadow-sm');
+                btn.classList.add('text-slate-500');
+            });
+            
+            // Reset sections
+            rawInput.classList.add('hidden');
+            redmineImporter.classList.add('hidden');
+            gsheetImporter.classList.add('hidden');
+            inputTools.classList.add('hidden');
 
             if (qaInputMode === 'MANUAL') {
                 btnManual.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
                 btnManual.classList.remove('text-slate-500');
-                btnRedmine.classList.remove('bg-white', 'text-corp-600', 'shadow-sm');
-                btnRedmine.classList.add('text-slate-500');
                 
                 rawInput.classList.remove('hidden');
-                redmineImporter.classList.add('hidden');
                 inputTools.classList.remove('hidden');
-            } else {
+            } 
+            else if (qaInputMode === 'REDMINE') {
                 btnRedmine.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
                 btnRedmine.classList.remove('text-slate-500');
+                
+                redmineImporter.classList.remove('hidden');
+            }
+            else if (qaInputMode === 'GSHEET') {
+                btnGSheet.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
+                btnGSheet.classList.remove('text-slate-500');
+                
+                gsheetImporter.classList.remove('hidden');
+            }
+        }
+
+        // --- CS SPECIFIC LOGIC ---
+        function setCsInputMode(mode) {
+            csInputMode = mode;
+            updateCsInputModeUI();
+        }
+
+        function updateCsInputModeUI() {
+            const btnManual = document.getElementById('btn-cs-mode-manual');
+            const btnLeave = document.getElementById('btn-cs-mode-leave');
+            const rawInput = document.getElementById('rawInput');
+            const csLeaveImporter = document.getElementById('csLeaveImporter');
+            const inputTools = document.getElementById('inputTools');
+
+            if (csInputMode === 'MANUAL') {
+                btnManual.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
+                btnManual.classList.remove('text-slate-500');
+                btnLeave.classList.remove('bg-white', 'text-corp-600', 'shadow-sm');
+                btnLeave.classList.add('text-slate-500');
+                
+                rawInput.classList.remove('hidden');
+                csLeaveImporter.classList.add('hidden');
+                inputTools.classList.remove('hidden');
+            } else {
+                btnLeave.classList.add('bg-white', 'text-corp-600', 'shadow-sm');
+                btnLeave.classList.remove('text-slate-500');
                 btnManual.classList.remove('bg-white', 'text-corp-600', 'shadow-sm');
                 btnManual.classList.add('text-slate-500');
                 
                 rawInput.classList.add('hidden');
-                redmineImporter.classList.remove('hidden');
-                inputTools.classList.add('hidden'); // Hide parser buttons when in Redmine config mode
+                csLeaveImporter.classList.remove('hidden');
+                inputTools.classList.add('hidden');
+                
+                renderCsLeaveList();
             }
         }
 
-        // --- ROBUST REDMINE FETCH LOGIC (TIME_ENTRIES.JSON) WITH AUTOMATIC PROXY FALLBACK ---
+        function addCsLeave() {
+            const name = document.getElementById('csLeaveName').value.trim();
+            const reason = document.getElementById('csLeaveReason').value.trim();
+            const hoursVal = document.getElementById('csLeaveHours').value;
+            
+            if(!name || !reason || !hoursVal) return showToast('請填寫完整資訊');
+            
+            const hours = parseFloat(hoursVal).toFixed(1);
+            
+            const newLeave = {
+                id: Date.now().toString(), // Simple unique ID
+                group: 'CS',
+                name: name,
+                reason: reason,
+                hours: hours
+            };
+            
+            // Add to structured array
+            if (!currentDailyData.leaves) currentDailyData.leaves = [];
+            currentDailyData.leaves.push(newLeave);
+            
+            // Reset inputs
+            document.getElementById('csLeaveName').value = '';
+            document.getElementById('csLeaveReason').value = '';
+            document.getElementById('csLeaveHours').value = '';
+            
+            // UI Update
+            renderCsLeaveList();
+            parseData(false); // Update dashboards
+            saveCurrentReport();
+            
+            // Keep focus for next entry
+            document.getElementById('csLeaveName').focus();
+        }
+
+        function deleteCsLeave(id) {
+            if(!currentDailyData.leaves) return;
+            currentDailyData.leaves = currentDailyData.leaves.filter(item => item.id !== id);
+            renderCsLeaveList();
+            parseData(false);
+            saveCurrentReport();
+        }
+
+        function renderCsLeaveList() {
+            const container = document.getElementById('csLeaveListDisplay');
+            container.innerHTML = '';
+            
+            const csLeaves = (currentDailyData.leaves || []).filter(l => l.group === 'CS');
+            
+            if (csLeaves.length === 0) {
+                container.innerHTML = `<div class="text-xs text-slate-400 text-center py-4 italic">尚未登錄任何請假資料</div>`;
+                return;
+            }
+
+            csLeaves.forEach(leave => {
+                const el = document.createElement('div');
+                el.className = 'flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2';
+                el.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="font-bold text-slate-700 text-xs">${leave.name}</div>
+                        <div class="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">${leave.reason}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="font-mono text-xs font-bold text-orange-500">${leave.hours}h</div>
+                        <button onclick="deleteCsLeave('${leave.id}')" class="text-slate-400 hover:text-rose-500 transition px-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // --- GOOGLE SHEET FETCH LOGIC ---
+        async function fetchGoogleSheetData() {
+            const sheetId = document.getElementById('gsheetId').value.trim();
+            const date = document.getElementById('reportDatePicker').value;
+            const btn = document.getElementById('btnFetchGSheet');
+            const statusMsg = document.getElementById('gsheetStatusMsg');
+            
+            statusMsg.className = 'hidden mt-1 p-2 rounded text-xs';
+            statusMsg.innerHTML = '';
+
+            if (!sheetId) return showToast('請輸入 Google Sheet ID');
+            if (!date) return showToast('請先選擇上方的「日報日期」');
+
+            // Column Indexes from UI (safe parsing)
+            // Default 0 1 2 3 3 4 5
+            const idx = {
+                date: parseInt(document.getElementById('colDate').value) || 0,
+                name: parseInt(document.getElementById('colName').value) || 1,
+                proj: parseInt(document.getElementById('colProj').value) || 2,
+                id:   parseInt(document.getElementById('colId').value) || 3,
+                cat:  parseInt(document.getElementById('colCat').value) || 3,
+                cont: parseInt(document.getElementById('colContent').value) || 4,
+                hrs:  parseInt(document.getElementById('colHours').value) || 5
+            };
+
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 讀取中...';
+            btn.disabled = true;
+
+            const updateStatus = (msg, type) => {
+                statusMsg.classList.remove('hidden', 'bg-rose-50', 'text-rose-700', 'bg-emerald-50', 'text-emerald-700');
+                if (type === 'error') statusMsg.classList.add('bg-rose-50', 'text-rose-700');
+                else statusMsg.classList.add('bg-emerald-50', 'text-emerald-700');
+                statusMsg.innerHTML = msg;
+            };
+
+            // Using Google Visualization API query to get JSON
+            // Also wrapping in CORS proxy to ensure access from any host
+            const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+            const strategies = [
+                { url: gvizUrl, name: 'Direct' },
+                { url: `https://corsproxy.io/?${encodeURIComponent(gvizUrl)}`, name: 'CorsProxy' },
+                { url: `https://api.allorigins.win/get?url=${encodeURIComponent(gvizUrl)}`, name: 'AllOrigins', wrapper: true }
+            ];
+
+            let successJson = null;
+
+            for (const strat of strategies) {
+                try {
+                    const res = await fetch(strat.url);
+                    if (!res.ok) throw new Error('Network Error');
+                    let text = await res.text();
+                    
+                    if (strat.wrapper) {
+                        const data = JSON.parse(text);
+                        text = data.contents;
+                    }
+
+                    // Remove wrapping: "/*O_o*/ google.visualization.Query.setResponse({ ... });"
+                    const start = text.indexOf('{');
+                    const end = text.lastIndexOf('}') + 1;
+                    if (start > -1 && end > -1) {
+                        successJson = JSON.parse(text.substring(start, end));
+                        break; 
+                    }
+                } catch(e) {
+                    console.warn(`GSheet Strat ${strat.name} failed`, e);
+                }
+            }
+
+            if (!successJson || !successJson.table) {
+                btn.innerHTML = '<i class="fa-brands fa-google mr-1"></i> 匯入資料';
+                btn.disabled = false;
+                updateStatus('<strong>讀取失敗</strong><br>無法讀取試算表。請確認 ID 正確且權限已設為「知道連結者皆可檢視」。', 'error');
+                return;
+            }
+
+            // Process Data
+            const rows = successJson.table.rows;
+            const userMap = {};
+            let count = 0;
+
+            rows.forEach(row => {
+                const c = row.c;
+                if (!c) return;
+
+                // Helper to get value
+                const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
+                
+                // Check Date
+                let rowDate = getVal(idx.date);
+                if (!rowDate || !String(rowDate).includes(date)) return;
+
+                const name = getVal(idx.name);
+                if (!name) return;
+
+                if (!userMap[name]) userMap[name] = { hours: 0, tasks: [] };
+
+                // Get values based on index
+                let proj = getVal(idx.proj) || '其他';
+                // Remove content inside 【】 brackets completely
+                proj = String(proj).replace(/【.*?】/g, '').trim();
+
+                // Get Raw Strings for ID and Cat
+                const rawIdStr = getVal(idx.id) || ''; 
+                const rawCatStr = getVal(idx.cat) || ''; // Usually same col as ID per user request
+
+                // 1. Process ID: Extract # and numbers only
+                let id = 'N/A';
+                const idMatch = String(rawIdStr).match(/#\d+/);
+                if (idMatch) {
+                    id = idMatch[0]; // e.g., "#221233"
+                } else {
+                    id = ''; // Empty if no #ID found
+                }
+
+                // 2. Process Category: Extract text after ID
+                let cat = '';
+                if (idx.id === idx.cat && id) {
+                     // If pulling from same column and ID was found
+                     const parts = String(rawCatStr).split(id);
+                     if (parts.length > 1) {
+                         // Take the part after ID
+                         cat = parts.slice(1).join(id).trim(); 
+                         // Remove leading :
+                         if (cat.startsWith(':') || cat.startsWith('：')) {
+                             cat = cat.substring(1).trim();
+                         }
+                     } else {
+                         cat = rawCatStr; 
+                     }
+                } else {
+                     cat = rawCatStr;
+                }
+                
+                const cont = getVal(idx.cont) || '';
+                const hrsStr = getVal(idx.hrs);
+                const hrs = parseFloat(hrsStr) || 0;
+
+                userMap[name].hours += hrs;
+                
+                // --- NEW STRUCTURED FORMAT ---
+                const lineStr = `[GS]__${proj}__${id}__${cat}__${cont}__${hrs}__編輯 刪除 動作`;
+                
+                userMap[name].tasks.push(lineStr);
+                count++;
+            });
+
+            if (count === 0) {
+                 updateStatus(`<strong>無資料</strong><br>日期 ${date} 沒有符合的資料。<br>(請確認試算表 A欄為日期格式)`, 'error');
+            } else {
+                 // Convert to String
+                 let finalOutput = "";
+                 Object.keys(userMap).forEach(userName => {
+                    const user = userMap[userName];
+                    const header = `OLD_TS品檢${userName} 小時: ${user.hours.toFixed(2)} 全部摺疊/全部展開`;
+                    const body = user.tasks.join(' ');
+                    finalOutput += `${header}${body} `;
+                 });
+
+                 // Update UI
+                 currentDailyData['QA'] = finalOutput;
+                 document.getElementById('rawInput').value = finalOutput;
+                 
+                 // Finish
+                 updateStatus(`<strong>匯入成功</strong><br>已讀取 ${count} 筆資料 (模式: Google Sheet)`, 'success');
+                 setQaInputMode('MANUAL'); // Switch to view result
+                 updateTabUI();
+                 parseData(false);
+                 saveCurrentReport();
+            }
+
+            btn.innerHTML = '<i class="fa-brands fa-google mr-1"></i> 匯入資料';
+            btn.disabled = false;
+        }
+
+        // --- NEW REDMINE FETCH LOGIC (ISSUES.JSON) - STANDARD HEADER METHOD ONLY ---
         async function fetchRedmineData() {
             const key = document.getElementById('redmineKey').value;
             const projectId = document.getElementById('redmineProjectId').value;
             const date = document.getElementById('reportDatePicker').value;
-            
             const btn = document.getElementById('btnFetchRedmine');
             const statusMsg = document.getElementById('fetchStatusMsg');
             
-            // UI Reset
             statusMsg.className = 'hidden mt-2 p-2 rounded text-xs';
             statusMsg.innerHTML = '';
             
             if (!key || !projectId) return showToast('請輸入 API Key 與 Project ID');
             if (!date) return showToast('請先選擇上方的「日報日期」');
 
-            // Base URL
+            // Construct Target URL
             const targetUrl = `https://igs.redmine-x.com/time_entries.json?project_id=${projectId}&spent_on=${date}&limit=100`;
             
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 撈取中...';
@@ -540,100 +933,67 @@
                 statusMsg.innerHTML = msg;
             };
 
-            // Define Strategies with priorities
+            // AUTO-FALLBACK STRATEGIES
             const strategies = [
-                // 1. Direct fetch with headers (The requested "Standard" way)
-                // Often blocked by browser CORS if server doesn't allow origin
                 {
                     name: 'Direct (Headers)',
                     url: targetUrl,
-                    headers: {
-                        "X-Redmine-API-Key": key,
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "X-Redmine-API-Key": key, "Content-Type": "application/json" },
                     useProxyWrapper: false
                 },
-                // 2. CorsProxy.io (Supports Headers)
-                // A reliable proxy that usually forwards custom headers
                 {
                     name: 'CorsProxy',
                     url: `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-                    headers: {
-                        "X-Redmine-API-Key": key
-                    },
+                    headers: { "X-Redmine-API-Key": key },
                     useProxyWrapper: false
                 },
-                // 3. Direct Simple Request (Key in URL, No Custom Headers)
-                // Sometimes bypasses strict Preflight checks
                 {
                     name: 'Direct (Simple)',
                     url: `${targetUrl}&key=${key}`,
                     headers: {},
                     useProxyWrapper: false
                 },
-                // 4. AllOrigins (Last Resort)
-                // JSONP style, very robust against CORS but can be slower
                 {
                     name: 'AllOrigins',
                     url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl + '&key=' + key)}`,
                     headers: {},
-                    useProxyWrapper: true // response is wrapped in { contents: "..." }
+                    useProxyWrapper: true
                 }
             ];
 
             let successData = null;
             let lastError = null;
 
-            // Execute Strategies Sequence
             for (const strategy of strategies) {
-                console.log(`Trying Strategy: ${strategy.name}`);
-                
-                if (strategy.name !== 'Direct (Headers)') {
-                    updateStatus(`<i class="fa-solid fa-rotate-right fa-spin mr-1"></i> 連線受阻，切換策略 (${strategy.name})...`, 'warn');
-                }
+                if (strategy.name !== 'Direct (Headers)') updateStatus(`<i class="fa-solid fa-rotate-right fa-spin mr-1"></i> 連線受阻，切換策略 (${strategy.name})...`, 'warn');
 
                 try {
-                    const response = await fetch(strategy.url, {
-                        method: 'GET',
-                        headers: strategy.headers
-                    });
-
+                    const response = await fetch(strategy.url, { method: 'GET', headers: strategy.headers });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
                     let data = await response.json();
-
-                    // Unwrap proxy response if needed
+                    
                     if (strategy.useProxyWrapper) {
-                        if (data.contents) {
-                            data = JSON.parse(data.contents);
-                        } else {
-                            throw new Error("Invalid Proxy Wrapper Response");
-                        }
+                        if (data.contents) data = JSON.parse(data.contents);
+                        else throw new Error("Invalid Proxy Wrapper");
                     }
 
-                    // Validate Data
                     if (data && data.time_entries) {
                         successData = data;
-                        break; // Stop loop, we got data
-                    } else {
-                        throw new Error("Invalid Data Format");
+                        break;
                     }
-
                 } catch (e) {
                     console.warn(`Strategy ${strategy.name} Failed:`, e);
                     lastError = e;
-                    // Continue to next strategy
                 }
             }
 
             if (successData) {
-                processRedmineData(successData.time_entries);
+                processRedmineData(successData.time_entries); 
                 showToast('Redmine 工時資料匯入成功');
                 setQaInputMode('MANUAL');
                 statusMsg.className = 'hidden'; 
             } else {
-                 console.error("All strategies failed", lastError);
-                 updateStatus(`<strong>撈取失敗</strong><br>所有連線方式皆失敗。<br>1. 請檢查 API Key 是否正確<br>2. 請確認網路環境 (VPN/防火牆)<br><span class="opacity-75">錯誤: ${lastError ? lastError.message : 'Unknown'}</span>`, 'error');
+                 updateStatus(`<strong>撈取失敗</strong><br>所有連線方式皆失敗。<br>1. 請檢查 API Key<br>2. 請確認 VPN/網路<br><span class="opacity-75">錯誤: ${lastError ? lastError.message : 'Unknown'}</span>`, 'error');
                  showToast('撈取失敗，請查看錯誤訊息');
             }
             
@@ -642,38 +1002,30 @@
         }
 
         function processRedmineData(entries) {
-            if (!entries || entries.length === 0) return showToast('無資料可匯入 (本日無工時)');
+            if (!entries || entries.length === 0) return showToast('無資料可匯入');
 
-            // 1. Group by User Name
             const userMap = {};
             
             entries.forEach(entry => {
                 const userName = entry.user ? entry.user.name : 'Unknown';
-                
                 if (!userMap[userName]) {
-                    userMap[userName] = {
-                        hours: 0,
-                        tasks: []
-                    };
+                    userMap[userName] = { hours: 0, tasks: [] };
                 }
                 
                 const hoursVal = entry.hours ? parseFloat(entry.hours) : 0;
                 userMap[userName].hours += hoursVal;
                 
-                // Map fields from Time Entry
                 const projectName = entry.project ? entry.project.name : 'Unknown';
                 const issueId = entry.issue ? entry.issue.id : 'General';
                 const comments = entry.comments || '';
                 const activity = entry.activity ? entry.activity.name : '';
                 
-                // Format: 【Project】 Activity #IssueID: Comments ｜ Hours
+                // Redmine keeps the original legacy format
                 const line = `【${projectName}】 ${activity} #${issueId}: ${comments}｜${hoursVal.toFixed(2)}編輯 刪除 動作`;
                 userMap[userName].tasks.push(line);
             });
 
-            // 2. Convert to OLD_TS String Format
             let finalOutput = "";
-            
             Object.keys(userMap).forEach(userName => {
                 const user = userMap[userName];
                 const header = `OLD_TS品檢${userName} ${user.hours.toFixed(2)} 小時: ${user.hours.toFixed(2)} 全部摺疊/全部展開`;
@@ -681,11 +1033,9 @@
                 finalOutput += `${header}${body} `;
             });
 
-            // 3. Update Data
             currentDailyData['QA'] = finalOutput;
             document.getElementById('rawInput').value = finalOutput;
             
-            // 4. Update UI
             updateTabUI();
             parseData(false);
             saveCurrentReport(); 
@@ -731,9 +1081,58 @@
                         rawTasks.forEach(t => {
                             t = t.trim();
                             if (t.length === 0) return;
+
+                            // ---------------------------------------------------------
+                            // MODE 1: Google Sheet Structured Format (Independent Logic)
+                            // Format: [GS]__Proj__ID__Cat__Content__Hrs
+                            // ---------------------------------------------------------
+                            if (t.startsWith('[GS]__')) {
+                                const parts = t.replace('[GS]__', '').split('__');
+                                // parts: [0]Proj, [1]ID, [2]Cat, [3]Content, [4]Hrs
+                                if (parts.length >= 5) {
+                                    const pProj = parts[0] || '其他';
+                                    const pId = parts[1] || 'N/A';
+                                    const pCat = parts[2] || '';
+                                    const pCont = parts[3] || '';
+                                    const pHrs = parseFloat(parts[4]) || 0;
+                                    
+                                    tasks.push({ 
+                                        project: pProj, 
+                                        category: pCat, 
+                                        id: pId, 
+                                        content: pCont, 
+                                        hours: pHrs 
+                                    });
+                                }
+                                return; // Skip legacy logic
+                            }
+
+
+                            // ---------------------------------------------------------
+                            // MODE 2: Legacy / Redmine Manual Input (Fuzzy Logic)
+                            // ---------------------------------------------------------
+
+                            // --- Ignore Redmine pagination and footer noise ---
+                            if (
+                                t.includes('Powered by Redmine') || 
+                                t.includes('Upgraded by RedmineX') ||
+                                t.includes('匯出至') || 
+                                (t.includes('每頁顯示') && t.includes('個')) || 
+                                t.match(/«\s*上一頁/) || 
+                                t.match(/下一頁\s*»/) ||
+                                /^\d+$/.test(t) || 
+                                /^Atom$/.test(t) ||
+                                /^CSV$/.test(t) ||
+                                /^XLSX$/.test(t)
+                            ) {
+                                return;
+                            }
+
                             const idMatch = t.match(/#(\d+)/);
                             const id = idMatch ? idMatch[1] : '';
                             let project = '其他';
+                            
+                            // Legacy Project Extraction Rule
                             if (t.includes('】') && t.includes('#')) {
                                 const match = t.match(/】(.*?)#/);
                                 if (match) project = match[1].trim();
@@ -744,10 +1143,12 @@
                                 if(match) project = match[1];
                             }
                             project = project.replace(/測試|支援|功能/g, '').trim();
+                            
                             const hoursMatch = t.match(/(\d+\.\d+)$/);
                             const taskHours = hoursMatch ? parseFloat(hoursMatch[1]) : 0;
                             let content = t;
                             let category = '';
+                            
                             if (idMatch) {
                                 const parts = t.split('#' + id);
                                 if (parts[1]) {
@@ -828,19 +1229,23 @@
             if (!data) {
                 // New Day - Reset all fields
                 ALL_GROUPS.forEach(g => currentDailyData[g] = '');
+                currentDailyData.leaves = [];
                 clearViews();
                 switchTab('ALL'); 
             } else {
-                // Compatibility check & Migration
+                // Load data
                 if (typeof data === 'string') {
-                    // Very old string version
-                     ALL_GROUPS.forEach(g => currentDailyData[g] = '');
-                     currentDailyData.QA = data; // Assume old was QA
+                      // Legacy support
+                      ALL_GROUPS.forEach(g => currentDailyData[g] = '');
+                      currentDailyData.QA = data; 
+                      currentDailyData.leaves = [];
                 } else {
-                    // Object version - merge to ensure new keys exist
+                    // Object version
                     ALL_GROUPS.forEach(g => {
                         currentDailyData[g] = data[g] || '';
                     });
+                    // Load leaves if exist
+                    currentDailyData.leaves = data.leaves || [];
                 }
                 
                 updateTabUI(); // Set dots
@@ -984,14 +1389,14 @@
                 const groupResult = groupParser.parse(rawContent);
                 
                 if (groupResult && groupResult.length > 0) {
-                     parsedData = parsedData.concat(groupResult);
-                     // Accumulate hours for total stat
-                     groupResult.forEach(p => totalTeamHours += p.totalHours);
+                      parsedData = parsedData.concat(groupResult);
+                      // Accumulate hours for total stat
+                      groupResult.forEach(p => totalTeamHours += p.totalHours);
                 }
             });
 
             // Even if we are in a tab with no data, we should render empty view
-            if (!hasAnyData) {
+            if (!hasAnyData && (!currentDailyData.leaves || currentDailyData.leaves.length === 0)) {
                 // If it's a specific tab, we might want to clear views, but also we are editing, 
                 // so we don't want to hide everything. Just hide results.
                 document.getElementById('analysisSection').classList.add('hidden');
@@ -1003,7 +1408,7 @@
                 return;
             }
 
-            if (parsedData.length === 0) {
+            if (parsedData.length === 0 && (!currentDailyData.leaves || currentDailyData.leaves.length === 0)) {
                 if (activeTab === 'ALL') updateMissingInfoText();
                 return;
             }
@@ -1054,9 +1459,10 @@
             tbody.innerHTML = rows;
 
             const leaveContainer = document.getElementById('leaveListContainer');
-            let hasLeave = false;
             let leaveHtml = `<ul class="space-y-3">`;
+            let hasLeave = false;
 
+            // 1. Render leaves from parsed text data (Legacy/Standard)
             parsedData.forEach(p => {
                 p.tasks.forEach(t => {
                     if (t.category.includes('請假') || t.content.includes('請假') || t.category.includes('特休') || t.category.includes('事假') || t.category.includes('病假')) {
@@ -1074,6 +1480,24 @@
                     }
                 });
             });
+
+            // 2. Render leaves from structured data (New CS feature)
+            if (currentDailyData.leaves && currentDailyData.leaves.length > 0) {
+                currentDailyData.leaves.forEach(l => {
+                    hasLeave = true;
+                    leaveHtml += `
+                        <li class="flex items-start bg-rose-50 border border-rose-100 p-2 rounded-lg">
+                            <div class="bg-rose-200 text-rose-700 rounded-full w-6 h-6 flex items-center justify-center shrink-0 mr-2 font-bold text-[10px]">${l.name[0]}</div>
+                            <div>
+                                <div class="font-bold text-slate-800 text-xs">${l.name} <span class="text-[10px] text-slate-400 font-normal ml-1">(${getGroupName(l.group)})</span></div>
+                                <div class="text-xs text-rose-600 font-medium mt-0.5">${l.reason}</div>
+                                <div class="text-[10px] text-slate-500 font-mono inline-block">${l.hours} hr</div>
+                            </div>
+                        </li>
+                    `;
+                });
+            }
+
             leaveHtml += `</ul>`;
             leaveContainer.innerHTML = hasLeave ? leaveHtml : `<div class="flex flex-col items-center justify-center h-full text-slate-400 py-4"><i class="fa-regular fa-calendar-check text-2xl mb-1 text-emerald-100"></i><p class="text-xs">全員出勤</p></div>`;
         }
@@ -1148,8 +1572,8 @@
                 `).join('');
 
                 card.innerHTML = `
-                    <div class="p-2 md:w-24 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
-                        <div class="font-bold text-sm text-slate-800 text-center leading-tight">
+                    <div class="p-2 md:w-auto md:min-w-[6rem] bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
+                        <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap">
                             ${displayName}
                         </div>
                         <div class="px-2 py-0.5 rounded-full text-[10px] font-bold ${hoursColor}">${p.totalHours.toFixed(1)}h</div>
