@@ -74,6 +74,16 @@
             backdrop-filter: blur(2px);
         }
 
+        /* Highlight animation for anchor jump */
+        @keyframes highlight-fade {
+            0% { background-color: #fef3c7; transform: scale(1.02); }
+            50% { background-color: #fef3c7; transform: scale(1.02); }
+            100% { background-color: white; transform: scale(1); }
+        }
+        .highlight-card {
+            animation: highlight-fade 2s ease-out;
+        }
+
     </style>
 </head>
 <body class="bg-slate-100 h-screen overflow-hidden text-slate-800 flex">
@@ -240,11 +250,11 @@
 
                 <!-- Raw Data Preview (Debug) -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                     <div class="flex justify-between items-center mb-2">
+                      <div class="flex justify-between items-center mb-2">
                         <h3 class="font-bold text-slate-500 text-sm">原始資料預覽 (Debug)</h3>
                         <span id="rawDataCount" class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">0 筆資料</span>
-                     </div>
-                     <textarea id="rawJsonPreview" class="w-full h-32 p-3 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-500 resize-none focus:outline-none" readonly placeholder="讀取後的資料將顯示於此..."></textarea>
+                      </div>
+                      <textarea id="rawJsonPreview" class="w-full h-32 p-3 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-500 resize-none focus:outline-none" readonly placeholder="讀取後的資料將顯示於此..."></textarea>
                 </div>
             </section>
 
@@ -608,6 +618,24 @@
                 anchor.scrollIntoView({ behavior: 'smooth' });
             }
         }
+
+        // Helper for anchor scroll to user
+        function getUserId(name) {
+            // Simple logic to generate safe ID from name (handling non-ascii if necessary, though simple replacement usually works for DOM IDs)
+            return 'user_card_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+        }
+
+        function scrollToUser(name) {
+            // Unescape name if it was passed from onclick string
+            const id = getUserId(name);
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Optional highlight effect
+                el.classList.add('highlight-card');
+                setTimeout(() => el.classList.remove('highlight-card'), 2000);
+            }
+        }
         // --- END SCROLL ACTIONS ---
 
 
@@ -929,7 +957,12 @@
             // Update Header Stats (always use global total hours for header)
             const statsText = `${userCount}人 / ${totalHoursGlobal.toFixed(1)}hr`;
             document.getElementById('headerTotalManHours').innerText = statsText;
-            document.getElementById('widgetTotalManHours').innerText = statsText;
+
+            // Calculate filtered stats for the widget header (Adjustment 3)
+            let filteredHours = 0;
+            filteredUserList.forEach(u => filteredHours += u.totalHours);
+            const filteredStatsText = `${filteredUserList.length}人 / ${filteredHours.toFixed(1)}hr`;
+            document.getElementById('widgetTotalManHours').innerText = filteredStatsText;
 
             // 2. Render Detail View (NOW TOP) - Uses filtered list
             renderDetailList(filteredUserList);
@@ -962,8 +995,12 @@
                 const shortName = cleanAuthorName(u.name);
                 const displayLabel = u.group ? `<span class="text-xs text-slate-400 mr-1">[${u.group}]</span>${shortName}` : shortName;
 
+                // Adjustments 1 & 2: Added onclick, title, cursor-pointer, and scrollToUser logic
+                // Pass name safely to scrollToUser (escape single quotes)
+                const safeName = u.name.replace(/'/g, "\\'");
+
                 rows += `
-                    <div class="flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition">
+                    <div onclick="scrollToUser('${safeName}')" class="cursor-pointer flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition" title="點擊跳轉到工作項目">
                         <div class="font-bold text-sm text-slate-700 truncate w-32 shrink-0" title="${u.name}">${displayLabel}</div>
                         <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
                              <div class="${barColor} h-2 rounded-full" style="width: ${width}%"></div>
@@ -1370,6 +1407,9 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
                 
+                // Add ID for anchor scroll (Adjustment 2)
+                card.id = getUserId(u.name);
+
                 // Clean Name & Group for Card Header
                 const shortName = cleanAuthorName(u.name);
                 
