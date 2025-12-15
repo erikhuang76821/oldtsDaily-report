@@ -1213,8 +1213,8 @@
                                 label: function(context) {
                                     let label = context.label || '';
                                     if (label) label += ': ';
-                                    let value = context.parsed;
-                                    let percentage = (value / total * 100).toFixed(1) + '%';
+                                    let value = context.parsed.toFixed(1);
+                                    let percentage = (context.parsed / total * 100).toFixed(1) + '%';
                                     return label + value + 'hr (' + percentage + ')';
                                 }
                             }
