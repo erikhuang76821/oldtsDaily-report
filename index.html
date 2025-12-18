@@ -288,7 +288,7 @@
                                 <button onclick="setAnalysisMode('PERSON')" id="btnModePerson" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">人員比對</button>
                                 <button onclick="setAnalysisMode('GROUP')" id="btnModeGroup" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">組別視角</button>
                             </div>
-                            <!-- Reset Buttons -->
+                            <!-- Reset Buttons (Dynamically shown) -->
                             <button id="btnResetPerson" onclick="resetPersonSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition">
                                 <i class="fa-solid fa-rotate-left mr-1"></i> 重置人員全選
                             </button>
@@ -611,7 +611,7 @@
         let shouldSelectAllPersons = false; // Flag to select all persons on first switch to PERSON mode
         
         let selectedProjects = new Set(); // Comparison set for Projects
-        let shouldSelectAllProjects = false; // Flag to select all projects on first switch
+        let shouldSelectAllProjects = true; // Flag to select all projects on first switch (Default true to load data on start)
 
         let currentTotalEntitiesCount = 0; // NEW: To track total count for "Select All" logic (shared context)
         
@@ -670,6 +670,9 @@
             if (currentDailyData.rows.length === 0) {
                 switchTab('SOURCE');
             }
+            
+            // Fix: Initialize Analysis Mode UI
+            setAnalysisMode('PROJECT'); 
         });
 
         // --- GLOBAL SETTINGS ---
@@ -1626,20 +1629,18 @@
             const chartHint = document.getElementById('chartLegendHint');
             const title = document.getElementById('entitySelectionTitle');
             
-            // Hide all resets first
+            // Hide all resets first - Visibility now managed inside renderTrendAnalysis based on selection state
             btnResetPerson.classList.add('hidden');
             btnResetProject.classList.add('hidden');
 
             if (mode === 'PERSON') {
                 entityArea.classList.remove('hidden');
                 chartHint.classList.add('hidden'); 
-                btnResetPerson.classList.remove('hidden'); 
                 title.innerHTML = '<i class="fa-solid fa-user-plus"></i> 點擊加入比對 (依組別分類)';
                 shouldSelectAllPersons = true; 
             } else if (mode === 'PROJECT') {
                 entityArea.classList.remove('hidden');
                 chartHint.classList.add('hidden'); 
-                btnResetProject.classList.remove('hidden'); 
                 title.innerHTML = '<i class="fa-solid fa-plus-circle"></i> 點擊加入比對 (專案清單)';
                 shouldSelectAllProjects = true;
             } else {
@@ -1751,12 +1752,23 @@
             const allEntities = new Set(); 
             const entityTotals = {}; 
             const personGroups = {}; // Helper for person grouping
+            
+            // NEW: Track unique authors per row (date) to calculate averages for GROUP mode
+            const rowStats = {}; // { date: { totalHours: 0, uniqueAuthors: Set() } }
 
             dates.forEach(date => {
                 aggregated[date] = {};
+                
+                // Initialize row stats for this date
+                if (!rowStats[date]) {
+                    rowStats[date] = { totalHours: 0, uniqueAuthors: new Set() };
+                }
+
                 if (db[date] && db[date].rows) {
                     db[date].rows.forEach(row => {
                         let key = '';
+                        let isRelevantForGroupStats = false;
+
                         if (analysisMode === 'PROJECT') {
                             key = row.project || '未分類';
                             const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(key));
@@ -1766,12 +1778,24 @@
                             personGroups[key] = cleanGroupName(row.group); 
                         } else if (analysisMode === 'GROUP') {
                             key = cleanGroupName(row.group);
+                            
+                            // Check relevance for Group Stats (Average calculation)
+                            // If no filter, all rows count. If filter active, only matching rows count.
+                            if (!activeTrendFilter || key === activeTrendFilter) {
+                                isRelevantForGroupStats = true;
+                            }
                         }
                         
                         const val = row.hours;
                         aggregated[date][key] = (aggregated[date][key] || 0) + val;
                         allEntities.add(key);
                         entityTotals[key] = (entityTotals[key] || 0) + val;
+
+                        // Accumulate stats for Group View Average Column
+                        if (analysisMode === 'GROUP' && isRelevantForGroupStats) {
+                            rowStats[date].totalHours += val;
+                            rowStats[date].uniqueAuthors.add(row.name);
+                        }
                     });
                 }
             });
@@ -1785,12 +1809,22 @@
                 const isProjectMode = (analysisMode === 'PROJECT');
                 const selectedSet = isProjectMode ? selectedProjects : selectedPersons;
                 const shouldSelectAll = isProjectMode ? shouldSelectAllProjects : shouldSelectAllPersons;
+                const btnReset = isProjectMode ? document.getElementById('btnResetProject') : document.getElementById('btnResetPerson');
 
                 // Handle Select All Flag
                 if (shouldSelectAll && entitiesArr.length > 0) {
                     entitiesArr.forEach(p => selectedSet.add(p));
                     if (isProjectMode) shouldSelectAllProjects = false;
                     else shouldSelectAllPersons = false;
+                }
+
+                // Check if currently "All Selected" to toggle Reset Button visibility
+                // Logic: If selection size < total count => Show Button. Else (Full selection) => Hide Button.
+                // Note: We also check > 0 to avoid showing it when there is no data at all.
+                if (selectedSet.size < currentTotalEntitiesCount && selectedSet.size > 0) {
+                    btnReset.classList.remove('hidden');
+                } else {
+                    btnReset.classList.add('hidden');
                 }
 
                 // Render Selection UI
@@ -1854,13 +1888,10 @@
             }
             
             // Prepare Chart DataSets
-            // Modified Logic Here
             let isStacked = false;
             if (analysisMode === 'GROUP') {
                 isStacked = true;
             } else if (analysisMode === 'PROJECT') {
-                // Stack only if showing ALL entities (Select All state)
-                // When we start filtering (comparison mode), we switch to grouped bars for better comparison
                 const allSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
                 isStacked = allSelected;
             }
@@ -1951,10 +1982,10 @@
                 }
             });
 
-            renderTrendTable(dates, entitiesArr, aggregated);
+            renderTrendTable(dates, entitiesArr, aggregated, rowStats);
         }
 
-        function renderTrendTable(dates, entities, dataMap) {
+        function renderTrendTable(dates, entities, dataMap, rowStats) {
             const table = document.getElementById('trendTable');
             
             const totals = {};
@@ -1963,12 +1994,16 @@
             });
             const sortedEntities = entities.sort((a,b) => totals[b] - totals[a]);
 
+            // Determine if we show the Avg column
+            const showAvg = (analysisMode === 'GROUP');
+
             let html = `
                 <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
                         <th class="px-2 py-2 font-bold text-slate-500">日期</th>
                         ${sortedEntities.map(e => `<th class="px-2 py-2 text-center text-slate-700 whitespace-nowrap">${e}</th>`).join('')}
                         <th class="px-2 py-2 text-right font-bold text-slate-700">總計</th>
+                        ${showAvg ? '<th class="px-2 py-2 text-right font-bold text-indigo-600 bg-indigo-50/30">平均/人</th>' : ''}
                     </tr>
                 </thead>
                 <tbody>
@@ -1984,11 +2019,24 @@
                     return `<td class="px-2 py-2 text-center border-b border-slate-50 ${val===0 ? 'text-slate-200' : 'text-slate-600 font-mono'}">${val > 0 ? val.toFixed(1) : '-'}</td>`;
                 });
 
+                // Calculate Avg for Group View
+                let avgCell = '';
+                if (showAvg) {
+                    const stats = rowStats[date] || { totalHours: 0, uniqueAuthors: new Set() };
+                    const count = stats.uniqueAuthors.size;
+                    const total = stats.totalHours;
+                    const avg = count > 0 ? (total / count).toFixed(1) : '-';
+                    // Optional tooltip to show calculation details
+                    const title = count > 0 ? `共 ${count} 人 (${total.toFixed(1)}hr)` : '';
+                    avgCell = `<td class="px-2 py-2 text-right font-bold font-mono text-indigo-600 border-b border-slate-50 bg-indigo-50/30" title="${title}">${avg}</td>`;
+                }
+
                 html += `
                     <tr class="hover:bg-slate-50 transition">
                         <td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${date}</td>
                         ${cells.join('')}
                         <td class="px-2 py-2 text-right font-bold text-slate-800 border-b border-slate-50 bg-slate-50/50">${rowTotal.toFixed(1)}</td>
+                        ${avgCell}
                     </tr>
                 `;
             });
