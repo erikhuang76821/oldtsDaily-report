@@ -103,10 +103,14 @@
             </button>
         </div>
         
-        <div class="p-3">
+        <div class="p-3 flex gap-2">
             <!-- Updated button for switching to previous day -->
-            <button onclick="switchToPreviousDay()" class="w-full bg-corp-600 hover:bg-corp-800 text-white py-2 px-4 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2">
+            <button onclick="switchToPreviousDay()" class="flex-1 bg-corp-600 hover:bg-corp-800 text-white py-2 px-3 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2" title="前一天">
                 <i class="fa-solid fa-chevron-left"></i> 切換到前日
+            </button>
+            <!-- New button for next day -->
+            <button onclick="switchToNextDay()" class="w-10 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg shadow-sm text-sm font-bold transition flex items-center justify-center" title="後一天">
+                <i class="fa-solid fa-chevron-right"></i>
             </button>
         </div>
 
@@ -235,6 +239,10 @@
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">小時 (Hours)</label>
                                     <input type="number" id="colHours" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="6">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-indigo-600">連結 (Link)</label>
+                                    <input type="number" id="colLink" class="w-full border border-indigo-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-indigo-50 text-indigo-700" value="7">
                                 </div>
                             </div>
                         </div>
@@ -516,12 +524,12 @@
         // Data Model:
         // { 
         //   config: { sheetId: '', cols: {...} },
-        //   rows: [ { name, group, project, issue, content, hours } ]
+        //   rows: [ { name, group, project, issue, content, hours, link } ]
         // }
         let currentDailyData = {
             config: {
                 sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
-                cols: { date: 0, group: 1, name: 2, proj: 3, id: 4, content: 5, hours: 6 } 
+                cols: { date: 0, group: 1, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
             },
             rows: []
         };
@@ -693,6 +701,7 @@
                 document.getElementById('colId').value = currentDailyData.config.cols.id;
                 document.getElementById('colContent').value = currentDailyData.config.cols.content;
                 document.getElementById('colHours').value = currentDailyData.config.cols.hours;
+                document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
                 updateRawPreview();
             } else if (tab === 'SETTINGS') {
                 settingsSec.classList.remove('hidden');
@@ -779,7 +788,8 @@
                 proj: parseInt(document.getElementById('colProj').value) || 3,
                 id:   parseInt(document.getElementById('colId').value) || 4,
                 content: parseInt(document.getElementById('colContent').value) || 5,
-                hours:  parseInt(document.getElementById('colHours').value) || 6
+                hours:  parseInt(document.getElementById('colHours').value) || 6,
+                link:  parseInt(document.getElementById('colLink').value) || 7
             };
             currentDailyData.config = { sheetId, cols };
 
@@ -866,6 +876,7 @@
                     
                     let idVal = String(getVal(cols.id)).trim();
                     let content = String(getVal(cols.content)).trim();
+                    let link = String(getVal(cols.link)).trim();
                     
                     const hrsVal = getVal(cols.hours);
                     const hours = parseFloat(hrsVal) || 0;
@@ -876,7 +887,8 @@
                         project: proj,
                         issue: idVal,
                         content: content,
-                        hours: hours
+                        hours: hours,
+                        link: link
                     });
                     count++;
                 });
@@ -1413,7 +1425,20 @@
                 // Clean Name & Group for Card Header
                 const shortName = cleanAuthorName(u.name);
                 
-                let tasksHtml = u.tasks.map(t => `
+                let tasksHtml = u.tasks.map(t => {
+                    // Logic for Link Button
+                    let linkHtml = '';
+                    if (t.link && t.link.startsWith('http')) {
+                         linkHtml = `
+                            <div class="mt-2 text-right">
+                                <a href="${t.link}" target="_blank" class="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 hover:text-indigo-800 transition font-bold border border-indigo-100">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> 開啟連結
+                                </a>
+                            </div>
+                         `;
+                    }
+
+                    return `
                     <div class="border-b border-slate-100 last:border-0">
                         <button class="accordion-btn w-full text-left p-2 flex items-center justify-between hover:bg-slate-50 transition group focus:outline-none" onclick="toggleTask(this)" aria-expanded="false">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 pr-4">
@@ -1427,9 +1452,12 @@
                             <div class="text-xs leading-relaxed pl-1 pt-2 border-t border-slate-100 border-dashed mx-3 mb-2 text-slate-600 whitespace-pre-line">
                                 ${formatContent(t.content)}
                             </div>
+                            <div class="px-3 pb-2">
+                                ${linkHtml}
+                            </div>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
 
                 card.innerHTML = `
                     <div class="p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
@@ -1506,6 +1534,20 @@
             
             loadReportByDate(prevDayISO);
             showToast(`已切換至前日 (${prevDayISO})`);
+        }
+
+        function switchToNextDay() {
+            const currentDate = currentReportDate;
+            const dateObj = new Date(currentDate + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() + 1);
+            
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const nextDayISO = `${year}-${month}-${day}`;
+            
+            loadReportByDate(nextDayISO);
+            showToast(`已切換至後日 (${nextDayISO})`);
         }
 
         function handleDateChange() {
