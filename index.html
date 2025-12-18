@@ -160,6 +160,10 @@
                     <button onclick="switchTab('OVERVIEW')" id="tab-OVERVIEW" class="header-tab-btn active">
                         <i class="fa-solid fa-chart-pie"></i> 總覽報表
                     </button>
+                    <!-- New Analysis Tab -->
+                    <button onclick="switchTab('ANALYSIS')" id="tab-ANALYSIS" class="header-tab-btn">
+                        <i class="fa-solid fa-chart-line"></i> 趨勢分析
+                    </button>
                     <button onclick="switchTab('SOURCE')" id="tab-SOURCE" class="header-tab-btn">
                         <i class="fa-solid fa-table"></i> 資料來源
                     </button>
@@ -263,6 +267,61 @@
                         <span id="rawDataCount" class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">0 筆資料</span>
                       </div>
                       <textarea id="rawJsonPreview" class="w-full h-32 p-3 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-500 resize-none focus:outline-none" readonly placeholder="讀取後的資料將顯示於此..."></textarea>
+                </div>
+            </section>
+
+            <!-- Analysis Trend Tab (NEW) -->
+            <section id="analysisTabSection" class="hidden max-w-5xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+                        <h2 class="font-bold text-slate-700 text-lg flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                                 <i class="fa-solid fa-chart-line"></i>
+                            </span>
+                            趨勢分析
+                        </h2>
+                        
+                        <!-- Controls -->
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <div class="flex bg-slate-100 p-1 rounded-lg">
+                                <button onclick="setAnalysisMode('PROJECT')" id="btnModeProject" class="px-3 py-1.5 text-xs font-bold rounded-md transition bg-white text-corp-600 shadow-sm">專案視角</button>
+                                <button onclick="setAnalysisMode('PERSON')" id="btnModePerson" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">人員視角</button>
+                                <button onclick="setAnalysisMode('GROUP')" id="btnModeGroup" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">組別視角</button>
+                            </div>
+                            <select id="analysisDays" onchange="renderTrendAnalysis()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:border-corp-600 cursor-pointer">
+                                <option value="7">最近 7 天</option>
+                                <option value="14">最近 14 天</option>
+                                <option value="30">最近 30 天</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Reset Filter Hint -->
+                    <div id="trendFilterHint" class="hidden mb-4 bg-corp-50 border border-corp-100 text-corp-800 px-4 py-2 rounded-lg text-sm flex justify-between items-center">
+                        <span id="trendFilterText" class="font-bold"></span>
+                        <button onclick="clearTrendFilter()" class="text-xs bg-white border border-corp-200 hover:bg-corp-100 px-3 py-1 rounded text-corp-600 transition">
+                            <i class="fa-solid fa-xmark mr-1"></i> 取消聚焦
+                        </button>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="relative h-80 w-full mb-8">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+
+                    <!-- Legend/Summary Hint -->
+                    <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 text-xs text-orange-800 mb-6 flex items-start gap-2">
+                        <i class="fa-solid fa-lightbulb mt-0.5"></i>
+                        <p>此圖表顯示所選期間內的工時堆疊變化。點擊圖表中的「長條圖區塊」可聚焦顯示該項目。資料來源為您瀏覽器中已儲存的歷史紀錄。</p>
+                    </div>
+
+                    <!-- Trend Table -->
+                    <div class="overflow-x-auto">
+                        <h3 class="font-bold text-slate-600 text-sm mb-3 pl-1 border-l-4 border-corp-600">詳細數據 (小時)</h3>
+                        <table class="w-full text-xs text-left text-slate-600" id="trendTable">
+                            <!-- Populated by JS -->
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -516,10 +575,15 @@
         const SETTINGS_KEY = 'daily_reports_settings_v1';
         let currentReportDate = '';
         let projectChartInstance = null; // Store chart instance
+        let trendChartInstance = null; // Store trend chart instance (New)
         let isMergeMode = false; // Track if we are in merge selection mode
         let ruleToDeleteIndex = -1; // Track index for deletion
         let ruleToEditIndex = -1; // Track index for editing
         let deleteType = ''; // 'project' or 'group'
+        
+        // Analysis State
+        let analysisMode = 'PROJECT'; // 'PROJECT', 'PERSON', or 'GROUP'
+        let activeTrendFilter = null; // Store current drill-down filter (e.g., 'John', 'Project A')
         
         // Data Model:
         // { 
@@ -682,14 +746,19 @@
             const sourceSec = document.getElementById('sourceSection');
             const overviewSec = document.getElementById('overviewSection');
             const settingsSec = document.getElementById('settingsSection');
+            const analysisSec = document.getElementById('analysisTabSection');
 
             sourceSec.classList.add('hidden');
             overviewSec.classList.add('hidden');
             settingsSec.classList.add('hidden');
+            analysisSec.classList.add('hidden');
 
             if (tab === 'OVERVIEW') {
                 overviewSec.classList.remove('hidden');
                 renderData(); // Refresh overview
+            } else if (tab === 'ANALYSIS') {
+                analysisSec.classList.remove('hidden');
+                renderTrendAnalysis();
             } else if (tab === 'SOURCE') {
                 sourceSec.classList.remove('hidden');
                 // Update config inputs from state
@@ -1144,7 +1213,10 @@
             
             if (allTasks.length === 0) {
                  document.getElementById('projectTableBody').innerHTML = '';
-                 if (projectChartInstance) projectChartInstance.destroy();
+                 if (projectChartInstance) {
+                     projectChartInstance.destroy();
+                     projectChartInstance = null;
+                 }
                  return;
             }
 
@@ -1202,6 +1274,7 @@
             
             if (projectChartInstance) {
                 projectChartInstance.destroy();
+                projectChartInstance = null; // Ensure null after destroy
             }
 
             projectChartInstance = new Chart(ctx, {
@@ -1491,6 +1564,202 @@
             } else {
                 content.classList.remove('expanded', 'p-3', 'pt-0');
             }
+        }
+
+        // --- TREND ANALYSIS LOGIC (NEW) ---
+        function setAnalysisMode(mode) {
+            analysisMode = mode;
+            activeTrendFilter = null; // Reset filter on mode change
+            
+            // Update UI
+            const btnProject = document.getElementById('btnModeProject');
+            const btnPerson = document.getElementById('btnModePerson');
+            const btnGroup = document.getElementById('btnModeGroup');
+            
+            const activeClass = ['bg-white', 'text-corp-600', 'shadow-sm'];
+            const inactiveClass = ['text-slate-500', 'hover:text-slate-700'];
+            
+            [btnProject, btnPerson, btnGroup].forEach(btn => {
+                btn.classList.remove(...activeClass);
+                btn.classList.add(...inactiveClass);
+            });
+
+            const activeBtn = mode === 'PROJECT' ? btnProject : (mode === 'PERSON' ? btnPerson : btnGroup);
+            activeBtn.classList.remove(...inactiveClass);
+            activeBtn.classList.add(...activeClass);
+
+            renderTrendAnalysis();
+        }
+
+        function clearTrendFilter() {
+            activeTrendFilter = null;
+            renderTrendAnalysis();
+        }
+
+        function renderTrendAnalysis() {
+            // UI Filter Hint
+            const hintBox = document.getElementById('trendFilterHint');
+            const hintText = document.getElementById('trendFilterText');
+            if (activeTrendFilter) {
+                hintBox.classList.remove('hidden');
+                hintText.innerText = `目前聚焦：${activeTrendFilter}`;
+            } else {
+                hintBox.classList.add('hidden');
+            }
+
+            // Get DB history
+            const db = getDB();
+            const daysToAnalyze = parseInt(document.getElementById('analysisDays').value) || 7;
+            
+            // Get Dates
+            const today = new Date();
+            const dates = [];
+            for(let i=daysToAnalyze-1; i>=0; i--) {
+                const d = new Date();
+                d.setDate(today.getDate() - i);
+                dates.push(d.toISOString().split('T')[0]);
+            }
+
+            // Aggregate Data
+            const aggregated = {};
+            const allEntities = new Set(); 
+
+            dates.forEach(date => {
+                aggregated[date] = {};
+                if (db[date] && db[date].rows) {
+                    db[date].rows.forEach(row => {
+                        let key = '';
+                        if (analysisMode === 'PROJECT') {
+                            key = row.project || '未分類';
+                            const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(key));
+                            if (mergeRule) key = mergeRule.alias;
+                        } else if (analysisMode === 'PERSON') {
+                            key = cleanAuthorName(row.name);
+                        } else if (analysisMode === 'GROUP') {
+                            key = cleanGroupName(row.group);
+                        }
+                        
+                        aggregated[date][key] = (aggregated[date][key] || 0) + row.hours;
+                        allEntities.add(key);
+                    });
+                }
+            });
+
+            // Filter Entities if Drill-down is active
+            let entitiesArr = Array.from(allEntities);
+            if (activeTrendFilter) {
+                entitiesArr = entitiesArr.filter(e => e === activeTrendFilter);
+            }
+            
+            // Prepare Chart DataSets
+            const datasets = entitiesArr.map((entity, i) => {
+                return {
+                    label: entity,
+                    data: dates.map(date => aggregated[date][entity] || 0),
+                    backgroundColor: getColor(i),
+                    stack: 'Stack 0',
+                };
+            });
+
+            // Render Chart
+            const ctxEl = document.getElementById('trendChart');
+            if (!ctxEl) return;
+            const ctx = ctxEl.getContext('2d');
+            
+            if (trendChartInstance) {
+                trendChartInstance.destroy();
+                trendChartInstance = null; // Ensure null
+            }
+
+            trendChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    onClick: (evt, activeElements, chart) => {
+                        if (activeElements.length > 0) {
+                            const datasetIndex = activeElements[0].datasetIndex;
+                            const label = chart.data.datasets[datasetIndex].label;
+                            activeTrendFilter = label;
+                            // Defer update to avoid destroying chart during event handling
+                            requestAnimationFrame(() => renderTrendAnalysis());
+                        }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true, title: { display: true, text: '總工時 (hr)' } }
+                    },
+                    plugins: {
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { boxWidth: 10, font: { size: 10 } },
+                            onClick: (e, legendItem, legend) => {
+                                // Override default hide behavior to focus instead
+                                const label = legendItem.text;
+                                activeTrendFilter = label;
+                                requestAnimationFrame(() => renderTrendAnalysis());
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Render Table (Pivot)
+            renderTrendTable(dates, entitiesArr, aggregated);
+        }
+
+        function renderTrendTable(dates, entities, dataMap) {
+            const table = document.getElementById('trendTable');
+            
+            // Sort entities by total hours descending for better readability
+            const totals = {};
+            entities.forEach(e => {
+                totals[e] = dates.reduce((sum, date) => sum + (dataMap[date][e] || 0), 0);
+            });
+            const sortedEntities = entities.sort((a,b) => totals[b] - totals[a]);
+
+            // Header
+            let html = `
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-2 py-2 font-bold text-slate-500">日期</th>
+                        ${sortedEntities.map(e => `<th class="px-2 py-2 text-center text-slate-700 whitespace-nowrap">${e}</th>`).join('')}
+                        <th class="px-2 py-2 text-right font-bold text-slate-700">總計</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            // Rows (reversed dates for table, newest first)
+            const reversedDates = [...dates].reverse();
+            
+            reversedDates.forEach(date => {
+                let rowTotal = 0;
+                const cells = sortedEntities.map(e => {
+                    const val = dataMap[date][e] || 0;
+                    rowTotal += val;
+                    return `<td class="px-2 py-2 text-center border-b border-slate-50 ${val===0 ? 'text-slate-200' : 'text-slate-600 font-mono'}">${val > 0 ? val.toFixed(1) : '-'}</td>`;
+                });
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${date}</td>
+                        ${cells.join('')}
+                        <td class="px-2 py-2 text-right font-bold text-slate-800 border-b border-slate-50 bg-slate-50/50">${rowTotal.toFixed(1)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody>';
+            table.innerHTML = html;
         }
 
         // --- HISTORY & DATA MANAGER ---
