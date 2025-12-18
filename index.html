@@ -285,12 +285,15 @@
                         <div class="flex flex-wrap gap-3 items-center">
                             <div class="flex bg-slate-100 p-1 rounded-lg">
                                 <button onclick="setAnalysisMode('PROJECT')" id="btnModeProject" class="px-3 py-1.5 text-xs font-bold rounded-md transition bg-white text-corp-600 shadow-sm">專案視角</button>
-                                <button onclick="setAnalysisMode('PERSON')" id="btnModePerson" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">比對模式</button>
+                                <button onclick="setAnalysisMode('PERSON')" id="btnModePerson" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">人員比對</button>
                                 <button onclick="setAnalysisMode('GROUP')" id="btnModeGroup" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">組別視角</button>
                             </div>
-                            <!-- Reset Button (Hidden by default, shown in PERSON mode) -->
+                            <!-- Reset Buttons -->
                             <button id="btnResetPerson" onclick="resetPersonSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition">
-                                <i class="fa-solid fa-rotate-left mr-1"></i> 重置全選
+                                <i class="fa-solid fa-rotate-left mr-1"></i> 重置人員全選
+                            </button>
+                            <button id="btnResetProject" onclick="resetProjectSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> 重置專案全選
                             </button>
                             
                             <select id="analysisDays" onchange="renderTrendAnalysis()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:border-corp-600 cursor-pointer">
@@ -301,7 +304,7 @@
                         </div>
                     </div>
 
-                    <!-- Filter Hint (Project/Group Focus) -->
+                    <!-- Filter Hint (Group Focus only now, Project and Person use comparison UI) -->
                     <div id="trendFilterHint" class="hidden mb-4 bg-corp-50 border border-corp-100 text-corp-800 px-4 py-2 rounded-lg text-sm flex justify-between items-center">
                         <span id="trendFilterText" class="font-bold"></span>
                         <button onclick="clearTrendFilter()" class="text-xs bg-white border border-corp-200 hover:bg-corp-100 px-3 py-1 rounded text-corp-600 transition">
@@ -314,17 +317,17 @@
                         <canvas id="trendChart"></canvas>
                     </div>
 
-                    <!-- Person Selector Area (Moved below chart) -->
-                    <div id="personSelectionArea" class="hidden mb-6 space-y-3">
+                    <!-- Entity Selector Area (Generic for Person & Project) -->
+                    <div id="entitySelectionArea" class="hidden mb-6 space-y-3">
                         <!-- Selected list hidden as requested -->
-                        <div id="selectedPersonContainer" class="hidden"></div>
+                        <div id="selectedEntityContainer" class="hidden"></div>
                         
                         <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                            <h4 class="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
-                                <i class="fa-solid fa-user-plus"></i> 點擊加入比對 (依組別分類)
+                            <h4 id="entitySelectionTitle" class="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
+                                <i class="fa-solid fa-plus-circle"></i> 點擊加入比對
                             </h4>
-                            <div id="unselectedPersonContainer" class="flex flex-col gap-3 max-h-48 overflow-y-auto custom-scroll p-1">
-                                <!-- Populated by JS with Groups -->
+                            <div id="unselectedEntityContainer" class="flex flex-col gap-3 max-h-48 overflow-y-auto custom-scroll p-1">
+                                <!-- Populated by JS -->
                             </div>
                         </div>
                     </div>
@@ -606,7 +609,11 @@
         let activeTrendFilter = null; // Store current drill-down filter (e.g., 'John', 'Project A')
         let selectedPersons = new Set(); // New: Set to store selected people for comparison
         let shouldSelectAllPersons = false; // Flag to select all persons on first switch to PERSON mode
-        let currentTotalEntitiesCount = 0; // NEW: To track total count for "Select All" logic
+        
+        let selectedProjects = new Set(); // Comparison set for Projects
+        let shouldSelectAllProjects = false; // Flag to select all projects on first switch
+
+        let currentTotalEntitiesCount = 0; // NEW: To track total count for "Select All" logic (shared context)
         
         // Data Model:
         // { 
@@ -1531,7 +1538,7 @@
                                     <i class="fa-solid fa-arrow-up-right-from-square"></i> 開啟連結
                                 </a>
                             </div>
-                         `;
+                          `;
                     }
 
                     return `
@@ -1598,7 +1605,9 @@
             const btnProject = document.getElementById('btnModeProject');
             const btnPerson = document.getElementById('btnModePerson');
             const btnGroup = document.getElementById('btnModeGroup');
-            const btnReset = document.getElementById('btnResetPerson'); // Reset button
+            
+            const btnResetPerson = document.getElementById('btnResetPerson');
+            const btnResetProject = document.getElementById('btnResetProject');
             
             const activeClass = ['bg-white', 'text-corp-600', 'shadow-sm'];
             const inactiveClass = ['text-slate-500', 'hover:text-slate-700'];
@@ -1612,26 +1621,37 @@
             activeBtn.classList.remove(...inactiveClass);
             activeBtn.classList.add(...activeClass);
 
-            // Toggle visibility of Person Selection Area & Reset Button
-            const personArea = document.getElementById('personSelectionArea');
+            // Toggle visibility of Entity Selection Area & Reset Buttons
+            const entityArea = document.getElementById('entitySelectionArea');
             const chartHint = document.getElementById('chartLegendHint');
+            const title = document.getElementById('entitySelectionTitle');
             
+            // Hide all resets first
+            btnResetPerson.classList.add('hidden');
+            btnResetProject.classList.add('hidden');
+
             if (mode === 'PERSON') {
-                personArea.classList.remove('hidden');
-                chartHint.classList.add('hidden'); // Hide simple hint in complex mode
-                btnReset.classList.remove('hidden'); // Show reset button
-                shouldSelectAllPersons = true; // Set flag to select all on initial load
+                entityArea.classList.remove('hidden');
+                chartHint.classList.add('hidden'); 
+                btnResetPerson.classList.remove('hidden'); 
+                title.innerHTML = '<i class="fa-solid fa-user-plus"></i> 點擊加入比對 (依組別分類)';
+                shouldSelectAllPersons = true; 
+            } else if (mode === 'PROJECT') {
+                entityArea.classList.remove('hidden');
+                chartHint.classList.add('hidden'); 
+                btnResetProject.classList.remove('hidden'); 
+                title.innerHTML = '<i class="fa-solid fa-plus-circle"></i> 點擊加入比對 (專案清單)';
+                shouldSelectAllProjects = true;
             } else {
-                personArea.classList.add('hidden');
+                entityArea.classList.add('hidden');
                 chartHint.classList.remove('hidden');
-                btnReset.classList.add('hidden'); // Hide reset button
-                shouldSelectAllPersons = false;
             }
 
-            // Don't clear selectedPersons immediately here to allow persistence if user switches back and forth,
-            // unless we want a fresh start. The prompt implies initial "all selected" when switching TO person mode.
+            // Initialization for modes
             if (mode === 'PERSON') {
                 selectedPersons.clear();
+            } else if (mode === 'PROJECT') {
+                selectedProjects.clear();
             }
 
             renderTrendAnalysis();
@@ -1642,52 +1662,71 @@
             renderTrendAnalysis();
         }
 
-        // New function to reset person selection
+        // Reset functions
         function resetPersonSelection() {
             shouldSelectAllPersons = true;
             selectedPersons.clear();
             renderTrendAnalysis();
         }
 
+        function resetProjectSelection() {
+            shouldSelectAllProjects = true;
+            selectedProjects.clear();
+            renderTrendAnalysis();
+        }
+
+        // Generic toggle for Projects
+        function toggleProjectSelection(name) {
+            if (analysisMode === 'PROJECT') {
+                const isAllSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
+                
+                if (isAllSelected) {
+                    selectedProjects.clear();
+                    selectedProjects.add(name);
+                } else {
+                    if (selectedProjects.size === 1 && selectedProjects.has(name)) {
+                        resetProjectSelection();
+                        return; 
+                    }
+                    if (selectedProjects.has(name)) {
+                        selectedProjects.delete(name);
+                    } else {
+                        selectedProjects.add(name);
+                    }
+                }
+                setTimeout(() => renderTrendAnalysis(), 0);
+            }
+        }
+
+        // Generic toggle for Persons
         function togglePersonSelection(name) {
             if (analysisMode === 'PERSON') {
-                // If currently All Selected (or close to it, specifically tracked by currentTotalEntitiesCount)
-                // And user clicks someone who IS selected (which is the only way if clicking chart)
-                // Then we enter "Focus" mode -> Select ONLY that person.
-                
                 const isAllSelected = (selectedPersons.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
                 
                 if (isAllSelected) {
                     selectedPersons.clear();
                     selectedPersons.add(name);
                 } else {
-                    // Check if this is the ONLY selected person and we are clicking it
                     if (selectedPersons.size === 1 && selectedPersons.has(name)) {
-                        // Reset to all selected
                         resetPersonSelection();
-                        return; // resetPersonSelection calls render, so return here
+                        return; 
                     }
-
-                    // Standard toggle
                     if (selectedPersons.has(name)) {
                         selectedPersons.delete(name);
                     } else {
                         selectedPersons.add(name);
                     }
                 }
-                // FIX: Defer render to avoid destroying chart while event is processing
                 setTimeout(() => renderTrendAnalysis(), 0);
-            } else {
-                // Should not happen for togglePersonSelection in other modes, but safe fallback
             }
         }
 
         function renderTrendAnalysis() {
-            // UI Filter Hint (Only for non-Person modes)
+            // UI Filter Hint (Only for GROUP mode now)
             const hintBox = document.getElementById('trendFilterHint');
             const hintText = document.getElementById('trendFilterText');
             
-            if (analysisMode !== 'PERSON' && activeTrendFilter) {
+            if (analysisMode === 'GROUP' && activeTrendFilter) {
                 hintBox.classList.remove('hidden');
                 hintText.innerText = `目前聚焦：${activeTrendFilter}`;
             } else {
@@ -1710,7 +1749,7 @@
             // Aggregate Data
             const aggregated = {};
             const allEntities = new Set(); 
-            const entityTotals = {}; // Helper for sorting
+            const entityTotals = {}; 
             const personGroups = {}; // Helper for person grouping
 
             dates.forEach(date => {
@@ -1724,7 +1763,7 @@
                             if (mergeRule) key = mergeRule.alias;
                         } else if (analysisMode === 'PERSON') {
                             key = cleanAuthorName(row.name);
-                            personGroups[key] = cleanGroupName(row.group); // Store group for this person
+                            personGroups[key] = cleanGroupName(row.group); 
                         } else if (analysisMode === 'GROUP') {
                             key = cleanGroupName(row.group);
                         }
@@ -1738,38 +1777,45 @@
             });
 
             let entitiesArr = Array.from(allEntities);
-            // Update Global Count for "Select All" logic
             currentTotalEntitiesCount = entitiesArr.length;
-
-            // Sort by total hours descending
             entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
 
-            // --- PERSON MODE SPECIFIC LOGIC ---
-            if (analysisMode === 'PERSON') {
-                // If flag is set, select all available persons
-                if (shouldSelectAllPersons && entitiesArr.length > 0) {
-                    entitiesArr.forEach(p => selectedPersons.add(p));
-                    shouldSelectAllPersons = false; // Reset flag
+            // --- COMPARISON MODE LOGIC (PERSON & PROJECT) ---
+            if (analysisMode === 'PERSON' || analysisMode === 'PROJECT') {
+                const isProjectMode = (analysisMode === 'PROJECT');
+                const selectedSet = isProjectMode ? selectedProjects : selectedPersons;
+                const shouldSelectAll = isProjectMode ? shouldSelectAllProjects : shouldSelectAllPersons;
+
+                // Handle Select All Flag
+                if (shouldSelectAll && entitiesArr.length > 0) {
+                    entitiesArr.forEach(p => selectedSet.add(p));
+                    if (isProjectMode) shouldSelectAllProjects = false;
+                    else shouldSelectAllPersons = false;
                 }
 
-                // Render Selection UI (Only Unselected Groups below chart)
-                const unselectedContainer = document.getElementById('unselectedPersonContainer');
+                // Render Selection UI
+                const unselectedContainer = document.getElementById('unselectedEntityContainer');
                 unselectedContainer.innerHTML = '';
 
-                // Group unselected persons
+                // Group unselected entities
                 const unselectedByGroup = {};
                 entitiesArr.forEach(p => {
-                    if (!selectedPersons.has(p)) {
-                        const grp = personGroups[p] || '其他';
+                    if (!selectedSet.has(p)) {
+                        let grp = '其他';
+                        if (isProjectMode) {
+                            grp = '專案清單'; // Projects just go into one list
+                        } else {
+                            grp = personGroups[p] || '其他';
+                        }
+                        
                         if (!unselectedByGroup[grp]) unselectedByGroup[grp] = [];
                         unselectedByGroup[grp].push(p);
                     }
                 });
 
-                // Render grouped unselected buttons
                 const sortedGroups = Object.keys(unselectedByGroup).sort();
                 if (sortedGroups.length === 0) {
-                    unselectedContainer.innerHTML = '<div class="text-xs text-slate-400 italic">所有人員已在圖表中</div>';
+                    unselectedContainer.innerHTML = '<div class="text-xs text-slate-400 italic">所有項目已在圖表中</div>';
                 } else {
                     sortedGroups.forEach(grp => {
                         const groupDiv = document.createElement('div');
@@ -1787,7 +1833,7 @@
                             const btn = document.createElement('button');
                             btn.className = "text-[10px] font-medium px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-corp-600 transition flex items-center gap-1 shadow-sm";
                             btn.innerHTML = `<i class="fa-solid fa-plus text-slate-300"></i> ${p}`;
-                            btn.onclick = () => togglePersonSelection(p);
+                            btn.onclick = () => isProjectMode ? toggleProjectSelection(p) : togglePersonSelection(p);
                             btnContainer.appendChild(btn);
                         });
                         
@@ -1797,11 +1843,10 @@
                 }
 
                 // Filter Chart Entities to only selected
-                entitiesArr = Array.from(selectedPersons);
-                // Keep chart order consistent (by total hours)
+                entitiesArr = Array.from(selectedSet);
                 entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
             } 
-            // --- OTHER MODES LOGIC ---
+            // --- GROUP MODE LOGIC ---
             else {
                 if (activeTrendFilter) {
                     entitiesArr = entitiesArr.filter(e => e === activeTrendFilter);
@@ -1809,13 +1854,23 @@
             }
             
             // Prepare Chart DataSets
+            // Modified Logic Here
+            let isStacked = false;
+            if (analysisMode === 'GROUP') {
+                isStacked = true;
+            } else if (analysisMode === 'PROJECT') {
+                // Stack only if showing ALL entities (Select All state)
+                // When we start filtering (comparison mode), we switch to grouped bars for better comparison
+                const allSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
+                isStacked = allSelected;
+            }
+            
             const datasets = entitiesArr.map((entity, i) => {
                 return {
                     label: entity,
                     data: dates.map(date => aggregated[date][entity] || 0),
                     backgroundColor: getColor(i),
-                    // Stacked true for others, false (grouped) for Person
-                    stack: analysisMode === 'PERSON' ? undefined : 'Stack 0', 
+                    stack: isStacked ? 'Stack 0' : undefined, 
                 };
             });
 
@@ -1826,7 +1881,7 @@
             
             if (trendChartInstance) {
                 trendChartInstance.destroy();
-                trendChartInstance = null; // Ensure null
+                trendChartInstance = null; 
             }
 
             trendChartInstance = new Chart(ctx, {
@@ -1844,28 +1899,26 @@
                             const label = chart.data.datasets[datasetIndex].label;
                             
                             if (analysisMode === 'PERSON') {
-                                // Toggle/Focus Person
                                 togglePersonSelection(label);
+                            } else if (analysisMode === 'PROJECT') {
+                                toggleProjectSelection(label);
                             } else {
-                                // Logic for PROJECT/GROUP
+                                // Group Mode Drill Down
                                 if (activeTrendFilter === label) {
-                                    // If clicking the already focused item, clear filter
                                     activeTrendFilter = null;
                                 } else {
-                                    // Focus Drill down
                                     activeTrendFilter = label;
                                 }
-                                // FIX: Change to setTimeout
                                 setTimeout(() => renderTrendAnalysis(), 0);
                             }
                         }
                     },
                     scales: {
                         x: { 
-                            stacked: analysisMode !== 'PERSON' 
+                            stacked: isStacked 
                         },
                         y: { 
-                            stacked: analysisMode !== 'PERSON', 
+                            stacked: isStacked, 
                             beginAtZero: true, 
                             title: { display: true, text: '總工時 (hr)' } 
                         }
@@ -1882,13 +1935,14 @@
                                 const label = legendItem.text;
                                 if (analysisMode === 'PERSON') {
                                     togglePersonSelection(label);
+                                } else if (analysisMode === 'PROJECT') {
+                                    toggleProjectSelection(label);
                                 } else {
                                     if (activeTrendFilter === label) {
                                         activeTrendFilter = null;
                                     } else {
                                         activeTrendFilter = label;
                                     }
-                                    // FIX: Change to setTimeout
                                     setTimeout(() => renderTrendAnalysis(), 0);
                                 }
                             }
@@ -1897,21 +1951,18 @@
                 }
             });
 
-            // Render Table (Pivot)
             renderTrendTable(dates, entitiesArr, aggregated);
         }
 
         function renderTrendTable(dates, entities, dataMap) {
             const table = document.getElementById('trendTable');
             
-            // Sort entities by total hours descending for better readability
             const totals = {};
             entities.forEach(e => {
                 totals[e] = dates.reduce((sum, date) => sum + (dataMap[date][e] || 0), 0);
             });
             const sortedEntities = entities.sort((a,b) => totals[b] - totals[a]);
 
-            // Header
             let html = `
                 <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
@@ -1923,7 +1974,6 @@
                 <tbody>
             `;
 
-            // Rows (reversed dates for table, newest first)
             const reversedDates = [...dates].reverse();
             
             reversedDates.forEach(date => {
