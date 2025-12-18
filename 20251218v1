@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>團隊日報管理系統 (GS版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js for Pie Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        corp: { 50: '#f0f9ff', 100: '#e0f2fe', 600: '#0284c7', 800: '#075985' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .active-date { background-color: #e0f2fe; border-right: 4px solid #0284c7; color: #075985; font-weight: bold; }
+        
+        /* Button Styles */
+        .header-tab-btn { 
+            @apply px-4 py-2 text-sm font-bold rounded-lg transition-all duration-200 flex items-center gap-2 text-slate-500 whitespace-nowrap relative border border-transparent flex-1 justify-center md:flex-none; 
+        }
+        
+        /* State: Hover */
+        .header-tab-btn:hover:not(.active) {
+            @apply bg-slate-100 text-slate-700;
+        }
+
+        /* State: Active (Selected) - High Contrast */
+        .header-tab-btn.active { 
+            @apply bg-corp-600 text-white shadow-md; 
+        }
+
+        /* Filter Button Styles */
+        .filter-btn {
+            @apply text-[10px] font-bold px-2 py-1 rounded transition bg-slate-100 text-slate-600 hover:bg-corp-100 hover:text-corp-600 border border-transparent;
+        }
+        .filter-btn.active {
+            @apply bg-corp-600 text-white border-corp-600;
+        }
+
+        /* Accordion transition */
+        .accordion-content {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .accordion-content.expanded {
+            max-height: 1000px; 
+            opacity: 1;
+        }
+        .accordion-icon {
+            transition: transform 0.3s ease;
+        }
+        .accordion-btn[aria-expanded="true"] .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+
+        /* Highlight animation for anchor jump */
+        @keyframes highlight-fade {
+            0% { background-color: #fef3c7; transform: scale(1.02); }
+            50% { background-color: #fef3c7; transform: scale(1.02); }
+            100% { background-color: white; transform: scale(1); }
+        }
+        .highlight-card {
+            animation: highlight-fade 2s ease-out;
+        }
+
+    </style>
+</head>
+<body class="bg-slate-100 h-screen overflow-hidden text-slate-800 flex">
+
+    <!-- Sidebar: History & Tools -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20 hidden md:flex transition-all duration-300" id="mainSidebar">
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+            <div>
+                <h1 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-corp-600"></i> 日報管理系統
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">Google Sheet 直讀版</p>
+            </div>
+            <!-- Mobile close button -->
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="p-3 flex gap-2">
+            <!-- Updated button for switching to previous day -->
+            <button onclick="switchToPreviousDay()" class="flex-1 bg-corp-600 hover:bg-corp-800 text-white py-2 px-3 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2" title="前一天">
+                <i class="fa-solid fa-chevron-left"></i> 切換到前日
+            </button>
+            <!-- New button for next day -->
+            <button onclick="switchToNextDay()" class="w-10 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg shadow-sm text-sm font-bold transition flex items-center justify-center" title="後一天">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scroll px-3">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2 mt-2">歷史紀錄</h3>
+            <div id="historyList" class="space-y-1">
+                <!-- JS Populated -->
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 bg-slate-50">
+            <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">資料管理</h3>
+            <div class="flex gap-2">
+                <button onclick="exportData()" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition" title="匯出 JSON">
+                    <i class="fa-solid fa-download"></i> 備份
+                </button>
+                <label class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition text-center cursor-pointer" title="匯入 JSON">
+                    <i class="fa-solid fa-upload"></i> 還原
+                    <input type="file" id="importFile" class="hidden" onchange="importData(this)" accept=".json">
+                </label>
+            </div>
+            <!-- Removed the clearAllData button/link -->
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full" id="mainContentScroll">
+        
+        <!-- Toolbar Header -->
+        <header class="bg-white border-b border-slate-200 p-3 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm z-10 shrink-0 gap-4 md:gap-0">
+            <div class="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 custom-scroll no-scrollbar">
+                <!-- Mobile Menu Toggle -->
+                <button onclick="toggleSidebar()" class="md:hidden text-slate-500 hover:text-slate-800 p-1">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+
+                <!-- Date Picker -->
+                <div class="flex flex-col mr-2 shrink-0">
+                    <label class="text-[10px] text-slate-400 font-bold uppercase leading-none mb-1">日報日期</label>
+                    <input type="date" id="reportDatePicker" class="font-bold text-base text-slate-800 bg-transparent border-none p-0 focus:ring-0 cursor-pointer h-6 w-32" onchange="handleDateChange()">
+                </div>
+
+                <div class="hidden md:block h-8 w-px bg-slate-200 mx-2 shrink-0"></div>
+
+                <!-- Tabs (Simplified) -->
+                <div class="flex items-center bg-slate-100 rounded-lg p-1 shrink-0 w-full md:w-auto">
+                    <button onclick="switchTab('OVERVIEW')" id="tab-OVERVIEW" class="header-tab-btn active">
+                        <i class="fa-solid fa-chart-pie"></i> 總覽報表
+                    </button>
+                    <button onclick="switchTab('SOURCE')" id="tab-SOURCE" class="header-tab-btn">
+                        <i class="fa-solid fa-table"></i> 資料來源
+                    </button>
+                    <button onclick="switchTab('SETTINGS')" id="tab-SETTINGS" class="header-tab-btn hidden md:flex">
+                        <i class="fa-solid fa-sliders"></i> 控制台
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Actions -->
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end mt-2 md:mt-0 shrink-0">
+                <div id="headerTotalManHours" class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full font-bold whitespace-nowrap">
+                    尚未計算
+                </div>
+                <!-- Updated button to handle combined Fetch/Save -->
+                <button onclick="handleHeaderAction()" class="bg-corp-600 hover:bg-corp-800 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6 bg-slate-50" id="scrollContainer">
+            
+            <!-- Source Settings Tab (Hidden by default) -->
+            <section id="sourceSection" class="hidden max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                             <i class="fa-brands fa-google-drive"></i>
+                        </span>
+                        Google Sheet 來源設定
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-600 mb-1">Google Sheet ID (試算表 ID)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入 ID 例如: 168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-xs text-slate-400">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            請確保試算表權限已設為「知道連結者皆可檢視」，系統將透過公開模式讀取。
+                        </p>
+
+                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">欄位對應 (Column Index: A=0, B=1, C=2...)</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">日期 (Date)</label>
+                                    <input type="number" id="colDate" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-emerald-600">組別 (Group)</label>
+                                    <input type="number" id="colGroup" class="w-full border border-emerald-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-emerald-50 text-emerald-700" value="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">填寫者 (Author)</label>
+                                    <input type="number" id="colName" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">專案 (Project)</label>
+                                    <input type="number" id="colProj" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="3">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">議題 (Issue)</label>
+                                    <input type="number" id="colId" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="4">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">回應 (Response)</label>
+                                    <input type="number" id="colContent" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="5">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">小時 (Hours)</label>
+                                    <input type="number" id="colHours" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="6">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-indigo-600">連結 (Link)</label>
+                                    <input type="number" id="colLink" class="w-full border border-indigo-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-indigo-50 text-indigo-700" value="7">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex items-center justify-between">
+                            <div id="gsheetStatusMsg" class="text-sm font-medium"></div>
+                            <button onclick="fetchGoogleSheetData()" id="btnFetchGSheet" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-green-600/20 transition flex items-center gap-2 transform hover:-translate-y-0.5">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> 讀取資料
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Raw Data Preview (Debug) -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                      <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold text-slate-500 text-sm">原始資料預覽 (Debug)</h3>
+                        <span id="rawDataCount" class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">0 筆資料</span>
+                      </div>
+                      <textarea id="rawJsonPreview" class="w-full h-32 p-3 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-500 resize-none focus:outline-none" readonly placeholder="讀取後的資料將顯示於此..."></textarea>
+                </div>
+            </section>
+
+            <!-- Settings Tab (Control Panel) -->
+            <section id="settingsSection" class="hidden max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                             <i class="fa-solid fa-sliders"></i>
+                        </span>
+                        控制台 (全局設定)
+                    </h2>
+                    
+                    <!-- 1. Source Flexibility Settings (Group Merges) - NEW -->
+                    <div class="space-y-4 mb-8">
+                        <div class="flex flex-col md:flex-row justify-between md:items-end pb-2 border-b border-slate-100 gap-2">
+                             <div>
+                                 <h3 class="font-bold text-slate-600 text-sm">來源彈性設定 (組別合併)</h3>
+                                 <p class="text-xs text-slate-400">設定 Google Sheet 原始組別名稱如何對應到系統顯示的組別。</p>
+                             </div>
+                        </div>
+
+                        <!-- Add New Group Rule Form -->
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col md:flex-row gap-2 items-start md:items-center">
+                            <input type="text" id="newGroupAlias" placeholder="顯示名稱 (如: 網頁)" class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:w-1/4 focus:outline-none focus:border-indigo-500">
+                            <input type="text" id="newGroupSources" placeholder="原始名稱 (逗號分隔, 如: 網頁組,網頁)" class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:flex-1 focus:outline-none focus:border-indigo-500">
+                            <button onclick="addGroupRule()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm whitespace-nowrap w-full md:w-auto">
+                                <i class="fa-solid fa-plus"></i> 新增
+                            </button>
+                        </div>
+
+                        <div id="groupRulesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- 2. Project Merge Rules List -->
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-end pb-2 border-b border-slate-100">
+                             <div>
+                                <h3 class="font-bold text-slate-600 text-sm">專案合併規則</h3>
+                                <p class="text-xs text-slate-400">這些規則會自動將多個專案名稱合併為一個，影響工時統計圖表。</p>
+                             </div>
+                        </div>
+
+                        <div id="mergeRulesContainer" class="space-y-2">
+                            <!-- Populated by JS -->
+                        </div>
+
+                        <div id="noRulesMsg" class="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                             尚未設定合併規則。<br>請至「總覽報表」的圓餅圖區塊勾選專案進行合併。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Overview Tab (Dashboard) -->
+            <section id="overviewSection" class="pb-12">
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden flex flex-col items-center justify-center py-12 text-slate-400">
+                    <i class="fa-regular fa-folder-open text-5xl mb-3 opacity-30"></i>
+                    <p class="text-sm">今日尚無資料，請至「資料來源設定」讀取 Google Sheet。</p>
+                </div>
+
+                <!-- Anchor for Result -->
+                <a id="resultAnchor"></a> 
+                
+                <!-- Detail List (Re-ordered to TOP) -->
+                <div id="resultSection" class="hidden space-y-4 mt-2"> <!-- Reduced top margin to mt-2 -->
+                    
+                    <!-- Header with Filter Buttons (Point 2 & 3) -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-2 gap-2">
+                        
+                        <!-- Left side flow: Heading + Filters -->
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <h3 class="font-bold text-slate-700 text-lg flex items-center gap-2 shrink-0">
+                                <i class="fa-solid fa-list-check text-slate-400"></i> 彙整結果
+                            </h3>
+                            <!-- Filter Buttons (Now flowing immediately after heading) -->
+                            <div id="groupFilterButtons" class="flex flex-wrap gap-1.5 pt-1">
+                                <!-- Filter Buttons -->
+                                <button class="filter-btn active" data-group="ALL" onclick="filterByGroup('ALL')">全部</button>
+                                <button class="filter-btn" data-group="品檢" onclick="filterByGroup('品檢')">品檢</button>
+                                <button class="filter-btn" data-group="網頁" onclick="filterByGroup('網頁')">網頁</button>
+                                <button class="filter-btn" data-group="資料庫" onclick="filterByGroup('資料庫')">資料庫</button>
+                                <button class="filter-btn" data-group="客服" onclick="filterByGroup('客服')">客服</button>
+                                <button class="filter-btn" data-group="技術" onclick="filterByGroup('技術')">技術</button>
+                            </div>
+                        </div>
+
+                        <!-- Right side: Scroll button (Point 3) -->
+                        <button onclick="scrollToAnalysis()" class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap shrink-0 transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-chart-column mr-1"></i> 工時統計
+                        </button>
+                    </div>
+                    <div id="detailView" class="space-y-2"></div>
+                </div>
+
+                <!-- Dashboard Widgets (Re-ordered to BOTTOM, Full Width) -->
+                <!-- Anchor for scrolling -->
+                <a id="analysisAnchor"></a> 
+                <div id="analysisSection" class="hidden mt-6 space-y-6"> <!-- Added space-y-6 for separation -->
+                    
+                    <!-- Work Hours Chart (Bar) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col w-full">
+                        <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                            <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-2">
+                                <i class="fa-solid fa-clock"></i>
+                            </span>
+                            工時統計
+                            <span id="widgetTotalManHours" class="ml-auto text-xs bg-slate-100 px-2 py-1 rounded-full font-normal text-slate-500"></span>
+                        </h3>
+                        
+                        <!-- 2-Column Grid Layout for Names -->
+                        <div id="hoursGridContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto custom-scroll max-h-[500px]">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Project Distribution Chart (Pie) - NEW ADDITION -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col w-full">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+                            <h3 class="font-bold text-slate-700 flex items-center">
+                                <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-2">
+                                    <i class="fa-solid fa-chart-pie"></i>
+                                </span>
+                                專案工時佔比
+                            </h3>
+                            <div class="flex gap-2" id="mergeTools">
+                                <!-- Dynamic Buttons -->
+                                <button id="btnCancelMerge" onclick="cancelMergeMode()" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                    <i class="fa-solid fa-xmark"></i> 取消
+                                </button>
+                                <button id="btnMergeAction" onclick="handleMergeButtonClick()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                    <i class="fa-solid fa-object-group"></i> <span>合併設定</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col md:flex-row gap-8 items-start">
+                            <!-- Chart Side -->
+                            <div class="w-full md:w-1/3 relative h-56 flex items-center justify-center shrink-0">
+                                <canvas id="projectPieChart"></canvas>
+                            </div>
+                            
+                            <!-- Table Side -->
+                            <div class="w-full md:w-2/3 overflow-x-auto">
+                                 <table class="w-full text-sm text-left text-slate-600">
+                                     <thead class="text-xs text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                                         <tr>
+                                             <th id="thCheckbox" class="px-3 py-2 w-8 text-center hidden">
+                                                <input type="checkbox" onclick="toggleAllProjectCheckboxes(this)" class="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                             </th>
+                                             <th class="px-3 py-2">專案 (包含合併項目)</th>
+                                             <th class="px-3 py-2 text-right">工時</th>
+                                             <th class="px-3 py-2 text-right">比例</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody id="projectTableBody" class="divide-y divide-slate-100">
+                                         <!-- Populated by JS -->
+                                     </tbody>
+                                 </table>
+                                 <p id="mergeHint" class="hidden text-[10px] text-slate-400 mt-2 text-right text-indigo-600 font-bold bg-indigo-50 inline-block px-2 py-1 rounded ml-auto w-full md:w-auto">* 請勾選上方項目並點擊「合併選取項目」</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Custom Modal for Merge Input -->
+    <div id="mergeDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700">合併確認</h3>
+                <button onclick="closeMergeDialog()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">合併後的名稱</label>
+                    <input type="text" id="mergeNameInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="請輸入名稱">
+                </div>
+                
+                <div class="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p class="font-bold mb-1 text-slate-500">即將合併以下項目：</p>
+                    <ul id="mergeListPreview" class="list-disc list-inside space-y-1 text-slate-500 max-h-32 overflow-y-auto">
+                        <!-- Items -->
+                    </ul>
+                </div>
+            </div>
+            <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
+                <button onclick="closeMergeDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="confirmMerge()" class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">確認合併</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal (New) -->
+    <div id="confirmDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-trash-can text-xl"></i>
+                </div>
+                <h3 class="font-bold text-slate-700 text-lg mb-2">移除規則</h3>
+                <p class="text-sm text-slate-500 mb-6">確定要刪除此規則嗎？</p>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="closeConfirmDialog()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition flex-1">取消</button>
+                    <button onclick="executeDeleteRule()" class="px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition flex-1 shadow-lg shadow-rose-200">確認刪除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Alias Modal (New) -->
+    <div id="editDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700">編輯名稱</h3>
+                <button onclick="closeEditDialog()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <label class="block text-xs font-bold text-slate-500 mb-1">合併後的顯示名稱</label>
+                <input type="text" id="editAliasInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition">
+            </div>
+            <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
+                <button onclick="closeEditDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="saveEditedProjectRule()" class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
+
+    <!-- Floating Back to Result Button (Point 1) -->
+    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-5 right-5 md:bottom-10 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-10 h-10 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5">
+        <i class="fa-solid fa-arrow-up text-sm"></i>
+    </button>
+
+    <script>
+        // --- STORAGE & STATE MANAGER ---
+        const DB_KEY = 'daily_reports_db_v6_gs_clean'; 
+        const SETTINGS_KEY = 'daily_reports_settings_v1';
+        let currentReportDate = '';
+        let projectChartInstance = null; // Store chart instance
+        let isMergeMode = false; // Track if we are in merge selection mode
+        let ruleToDeleteIndex = -1; // Track index for deletion
+        let ruleToEditIndex = -1; // Track index for editing
+        let deleteType = ''; // 'project' or 'group'
+        
+        // Data Model:
+        // { 
+        //   config: { sheetId: '', cols: {...} },
+        //   rows: [ { name, group, project, issue, content, hours, link } ]
+        // }
+        let currentDailyData = {
+            config: {
+                sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
+                cols: { date: 0, group: 1, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
+            },
+            rows: []
+        };
+        
+        // Default Group Merges requested by user
+        const DEFAULT_GROUP_MERGES = [
+            { alias: '品檢', originals: ['品檢組', '品檢'] },
+            { alias: '技術', originals: ['技術', '技術組'] },
+            { alias: '網頁', originals: ['網頁組', '網頁'] },
+            { alias: '客服組', originals: ['客服組', '【客服組】'] }
+        ];
+
+        // Global Settings Model:
+        // { projectMerges: [...], groupMerges: [...] }
+        let globalSettings = {
+            projectMerges: [],
+            groupMerges: []
+        };
+        
+        let activeTab = 'OVERVIEW'; 
+        let activeFilterGroup = 'ALL'; 
+
+        // Chart Colors Palette
+        const CHART_COLORS = [
+            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
+            '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6',
+            '#f43f5e', '#a855f7', '#0ea5e9', '#22c55e', '#eab308'
+        ];
+        function getColor(index) { return CHART_COLORS[index % CHART_COLORS.length]; }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGlobalSettings();
+            const today = new Date().toISOString().split('T')[0];
+            updateHistoryList();
+            loadReportByDate(today);
+            
+            // Initial scroll listener setup
+            const scrollContainer = document.getElementById('scrollContainer');
+            if (scrollContainer) {
+                scrollContainer.addEventListener('scroll', handleScroll);
+            }
+            
+            if (currentDailyData.rows.length === 0) {
+                switchTab('SOURCE');
+            }
+        });
+
+        // --- GLOBAL SETTINGS ---
+        function loadGlobalSettings() {
+            const stored = localStorage.getItem(SETTINGS_KEY);
+            if (stored) {
+                globalSettings = JSON.parse(stored);
+                if (!globalSettings.projectMerges) globalSettings.projectMerges = [];
+                if (!globalSettings.groupMerges) globalSettings.groupMerges = JSON.parse(JSON.stringify(DEFAULT_GROUP_MERGES));
+            } else {
+                // Initialize with defaults
+                globalSettings.groupMerges = JSON.parse(JSON.stringify(DEFAULT_GROUP_MERGES));
+                saveGlobalSettings();
+            }
+        }
+
+        function saveGlobalSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(globalSettings));
+            renderSettingsTab(); // Update UI
+        }
+
+        // --- SCROLL LISTENERS & ACTIONS ---
+        function handleScroll() {
+            const scrollContainer = document.getElementById('scrollContainer');
+            const button = document.getElementById('backToResultBtn');
+            if (!scrollContainer || !button) return;
+
+            // Show button if scrolled down significantly (e.g., more than 400px)
+            if (scrollContainer.scrollTop > 400) {
+                button.classList.remove('opacity-0', 'translate-y-5');
+                button.classList.add('opacity-100', 'translate-y-0');
+            } else {
+                button.classList.remove('opacity-100', 'translate-y-0');
+                button.classList.add('opacity-0', 'translate-y-5');
+            }
+        }
+        
+        function scrollToResult() {
+            const anchor = document.getElementById('resultAnchor');
+            if (anchor) {
+                anchor.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        function scrollToAnalysis() {
+            const anchor = document.getElementById('analysisAnchor');
+            if (anchor) {
+                anchor.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Helper for anchor scroll to user
+        function getUserId(name) {
+            // Simple logic to generate safe ID from name (handling non-ascii if necessary, though simple replacement usually works for DOM IDs)
+            return 'user_card_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+        }
+
+        function scrollToUser(name) {
+            // Unescape name if it was passed from onclick string
+            const id = getUserId(name);
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Optional highlight effect
+                el.classList.add('highlight-card');
+                setTimeout(() => el.classList.remove('highlight-card'), 2000);
+            }
+        }
+        // --- END SCROLL ACTIONS ---
+
+
+        // Sidebar Toggle Logic
+        function toggleSidebar() {
+            const sidebar = document.getElementById('mainSidebar');
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('absolute', 'w-full', 'h-full', 'left-0', 'top-0');
+            } else {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('absolute', 'w-full', 'h-full', 'left-0', 'top-0');
+            }
+        }
+
+        function getDB() {
+            const data = localStorage.getItem(DB_KEY);
+            return data ? JSON.parse(data) : {};
+        }
+
+        function saveDB(data) {
+            localStorage.setItem(DB_KEY, JSON.stringify(data));
+            updateHistoryList();
+        }
+
+        // --- TAB LOGIC ---
+        function switchTab(tab) {
+            activeTab = tab;
+
+            // UI Buttons
+            document.querySelectorAll('.header-tab-btn').forEach(btn => btn.classList.remove('active'));
+            const tabBtn = document.getElementById(`tab-${tab}`);
+            if(tabBtn) tabBtn.classList.add('active');
+            
+            // Sections
+            const sourceSec = document.getElementById('sourceSection');
+            const overviewSec = document.getElementById('overviewSection');
+            const settingsSec = document.getElementById('settingsSection');
+
+            sourceSec.classList.add('hidden');
+            overviewSec.classList.add('hidden');
+            settingsSec.classList.add('hidden');
+
+            if (tab === 'OVERVIEW') {
+                overviewSec.classList.remove('hidden');
+                renderData(); // Refresh overview
+            } else if (tab === 'SOURCE') {
+                sourceSec.classList.remove('hidden');
+                // Update config inputs from state
+                document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
+                document.getElementById('colDate').value = currentDailyData.config.cols.date;
+                document.getElementById('colGroup').value = currentDailyData.config.cols.group;
+                document.getElementById('colName').value = currentDailyData.config.cols.name;
+                document.getElementById('colProj').value = currentDailyData.config.cols.proj;
+                document.getElementById('colId').value = currentDailyData.config.cols.id;
+                document.getElementById('colContent').value = currentDailyData.config.cols.content;
+                document.getElementById('colHours').value = currentDailyData.config.cols.hours;
+                document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
+                updateRawPreview();
+            } else if (tab === 'SETTINGS') {
+                settingsSec.classList.remove('hidden');
+                renderSettingsTab();
+            }
+        }
+
+        function updateRawPreview() {
+            const ta = document.getElementById('rawJsonPreview');
+            const countSpan = document.getElementById('rawDataCount');
+            if(currentDailyData.rows && currentDailyData.rows.length > 0) {
+                ta.value = JSON.stringify(currentDailyData.rows, null, 2);
+                countSpan.innerText = `${currentDailyData.rows.length} 筆資料`;
+            } else {
+                ta.value = '';
+                countSpan.innerText = `0 筆資料`;
+            }
+        }
+
+        // --- FILTER LOGIC ---
+        function filterByGroup(groupCode) {
+            if (activeFilterGroup === groupCode && groupCode !== 'ALL') {
+                // Toggle off if clicking the active filter (unless it's ALL)
+                activeFilterGroup = 'ALL';
+            } else {
+                activeFilterGroup = groupCode;
+            }
+
+            // Update button styles
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-group') === activeFilterGroup) {
+                    btn.classList.add('active');
+                }
+            });
+
+            renderData(); // Re-render content based on new filter
+        }
+
+        // --- HEADER UPDATE ACTION ---
+        function handleHeaderAction() {
+            fetchGoogleSheetData();
+        }
+
+        // --- HELPER: Group Name Consolidation (UPDATED TO USE SETTINGS) ---
+        function cleanGroupName(group) {
+            if (!group) return '其他';
+            group = group.trim();
+            
+            // Iterate through user defined rules first
+            if (globalSettings.groupMerges) {
+                for (const rule of globalSettings.groupMerges) {
+                    if (rule.originals.includes(group)) {
+                        return rule.alias;
+                    }
+                }
+            }
+            
+            return group;
+        }
+
+        // --- GOOGLE SHEET FETCH LOGIC (Main Driver) ---
+        async function fetchGoogleSheetData() {
+            const sheetId = document.getElementById('gsheetId').value.trim();
+            const date = document.getElementById('reportDatePicker').value;
+            const btn = document.getElementById('btnFetchGSheet');
+            const statusMsg = document.getElementById('gsheetStatusMsg');
+            
+            statusMsg.className = 'text-sm font-medium';
+            statusMsg.innerHTML = '';
+
+            if (!sheetId) {
+                // If ID is missing, switch to Source tab immediately for correction
+                switchTab('SOURCE');
+                return showToast('請先設定 Google Sheet ID');
+            }
+            if (!date) return showToast('請選擇日期');
+
+            // --- Capture Config from DOM inputs (as they hold the definitive current settings) ---
+            const cols = {
+                date: parseInt(document.getElementById('colDate').value) || 0,
+                group: parseInt(document.getElementById('colGroup').value) || 1,
+                name: parseInt(document.getElementById('colName').value) || 2,
+                proj: parseInt(document.getElementById('colProj').value) || 3,
+                id:   parseInt(document.getElementById('colId').value) || 4,
+                content: parseInt(document.getElementById('colContent').value) || 5,
+                hours:  parseInt(document.getElementById('colHours').value) || 6,
+                link:  parseInt(document.getElementById('colLink').value) || 7
+            };
+            currentDailyData.config = { sheetId, cols };
+
+            // --- UI Busy State ---
+            const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
+            headerBtn.disabled = true;
+            btn.disabled = true;
+            headerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span class="hidden md:inline">更新中</span>';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 讀取中...';
+
+
+            const updateStatus = (msg, type) => {
+                statusMsg.className = type === 'error' ? 'text-rose-600 text-sm font-bold' : 'text-emerald-600 text-sm font-bold';
+                statusMsg.innerHTML = msg;
+            };
+
+            // --- MODE: PUBLIC (Legacy GVIZ) ---
+            const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+            const strategies = [
+                { url: gvizUrl, name: 'Direct' },
+                { url: `https://corsproxy.io/?${encodeURIComponent(gvizUrl)}`, name: 'CorsProxy' },
+                { url: `https://api.allorigins.win/get?url=${encodeURIComponent(gvizUrl)}`, name: 'AllOrigins', wrapper: true }
+            ];
+
+            let successJson = null;
+
+            for (const strat of strategies) {
+                try {
+                    const res = await fetch(strat.url);
+                    if (!res.ok) throw new Error('Network Error');
+                    let text = await res.text();
+                    
+                    if (strat.wrapper) {
+                        const data = JSON.parse(text);
+                        text = data.contents;
+                    }
+
+                    // Remove wrapping: "/*O_o*/ google.visualization.Query.setResponse({ ... });"
+                    const start = text.indexOf('{');
+                    const end = text.lastIndexOf('}') + 1;
+                    if (start > -1 && end > -1) {
+                        successJson = JSON.parse(text.substring(start, end));
+                        break; 
+                    }
+                } catch(e) {
+                    console.warn(`GSheet Strat ${strat.name} failed`, e);
+                }
+            }
+            
+            // --- UI Reset ---
+            headerBtn.disabled = false;
+            btn.disabled = false;
+            headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取資料';
+
+            if (!successJson || !successJson.table) {
+                updateStatus('讀取失敗：無法存取試算表。請確認 ID 正確且權限已設為「知道連結者皆可檢視」。', 'error');
+                currentDailyData.rows = [];
+            } else {
+                // Process Data from GVIZ structure
+                const rows = successJson.table.rows;
+                const fetchedData = [];
+                let count = 0;
+
+                rows.forEach(row => {
+                    const c = row.c;
+                    if (!c) return;
+                    const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
+
+                    // Use the configured column indices
+                    let rowDate = getVal(cols.date);
+                    if (!rowDate || !String(rowDate).includes(date)) return;
+
+                    const name = String(getVal(cols.name)).trim();
+                    if (!name) return;
+
+                    const rawGroupName = String(getVal(cols.group)).trim();
+                    const groupName = cleanGroupName(rawGroupName); // Group Name Consolidation
+                    
+                    let proj = String(getVal(cols.proj)).trim();
+                    
+                    // Project Cleaning Optimization: Remove content wrapped in 【】
+                    proj = proj.replace(/【.*?】/g, '').trim(); 
+                    
+                    let idVal = String(getVal(cols.id)).trim();
+                    let content = String(getVal(cols.content)).trim();
+                    let link = String(getVal(cols.link)).trim();
+                    
+                    const hrsVal = getVal(cols.hours);
+                    const hours = parseFloat(hrsVal) || 0;
+
+                    fetchedData.push({
+                        name: name,
+                        group: groupName, // Storing the CLEANED group name
+                        project: proj,
+                        issue: idVal,
+                        content: content,
+                        hours: hours,
+                        link: link
+                    });
+                    count++;
+                });
+
+                currentDailyData.rows = fetchedData;
+                updateStatus(`成功：已讀取 ${currentDailyData.rows.length} 筆資料`, 'success');
+                saveCurrentReport(); // Automatic save on successful fetch
+                updateRawPreview();
+                showToast('資料已更新並儲存');
+                
+                // Switch back to overview only if not already on source tab
+                if (activeTab !== 'OVERVIEW') {
+                    switchTab('OVERVIEW');
+                } else {
+                    renderData(); // Rerender if already on Overview
+                }
+            }
+        }
+
+        // --- RENDER LOGIC (Aggregator) ---
+
+        // HELPER: Clean Author Name (Rightmost 5 chars)
+        function cleanAuthorName(name) {
+            if (!name) return 'Unknown';
+            return name.slice(-5); // Keep only last 5 characters
+        }
+        
+        function renderData() {
+            const rawRows = currentDailyData.rows || [];
+            
+            const analysisSection = document.getElementById('analysisSection');
+            const resultSection = document.getElementById('resultSection');
+            const emptyState = document.getElementById('emptyState');
+
+            if (rawRows.length === 0) {
+                analysisSection.classList.add('hidden');
+                resultSection.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                document.getElementById('headerTotalManHours').innerText = "0 人 / 0.0hr";
+                return;
+            }
+
+            analysisSection.classList.remove('hidden');
+            resultSection.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+
+            // 1. Group by User (Grouping uses the CLEANED group name already stored in rows)
+            const userMap = {};
+            let totalHoursGlobal = 0;
+
+            rawRows.forEach(row => {
+                if (!userMap[row.name]) {
+                    userMap[row.name] = { 
+                        name: row.name, 
+                        group: row.group || '其他', // Use the cleaned group name stored
+                        totalHours: 0, 
+                        tasks: [] 
+                    };
+                }
+                
+                userMap[row.name].totalHours += row.hours;
+                userMap[row.name].tasks.push(row);
+                totalHoursGlobal += row.hours;
+            });
+
+            const userList = Object.values(userMap);
+            
+            // --- APPLY FILTER ---
+            let filteredUserList = userList;
+            if (activeFilterGroup !== 'ALL') {
+                // Filter is applied against the already cleaned 'group' field in the user object
+                filteredUserList = userList.filter(u => u.group === activeFilterGroup);
+            }
+            // --- END APPLY FILTER ---
+
+            const userCount = userList.length; // Global count remains based on all data.
+
+            // Update Header Stats (always use global total hours for header)
+            const statsText = `${userCount}人 / ${totalHoursGlobal.toFixed(1)}hr`;
+            document.getElementById('headerTotalManHours').innerText = statsText;
+
+            // Calculate filtered stats for the widget header (Adjustment 3)
+            let filteredHours = 0;
+            filteredUserList.forEach(u => filteredHours += u.totalHours);
+            const filteredStatsText = `${filteredUserList.length}人 / ${filteredHours.toFixed(1)}hr`;
+            document.getElementById('widgetTotalManHours').innerText = filteredStatsText;
+
+            // 2. Render Detail View (NOW TOP) - Uses filtered list
+            renderDetailList(filteredUserList);
+
+            // 3. Render Dashboard Widgets (NOW BOTTOM) - Uses filtered list
+            renderDashboardWidgets(filteredUserList);
+
+            // 4. Render Project Pie Chart - Uses filtered list data
+            renderProjectStats(filteredUserList);
+        }
+
+
+        function renderDashboardWidgets(userList) {
+            const container = document.getElementById('hoursGridContainer');
+            container.innerHTML = '';
+            
+            // Sort by hours desc
+            const sorted = [...userList].sort((a,b) => b.totalHours - a.totalHours);
+
+            let rows = '';
+            sorted.forEach(u => {
+                let barColor = 'bg-emerald-500';
+                let hoursClass = 'text-emerald-700';
+                if (u.totalHours < 8) { barColor = 'bg-amber-400'; hoursClass = 'text-amber-700'; }
+                else if (u.totalHours > 10) { barColor = 'bg-rose-500'; hoursClass = 'text-rose-700'; }
+                
+                let width = Math.min((u.totalHours / 12) * 100, 100);
+                
+                // Clean Name & Group
+                const shortName = cleanAuthorName(u.name);
+                const displayLabel = u.group ? `<span class="text-xs text-slate-400 mr-1">[${u.group}]</span>${shortName}` : shortName;
+
+                // Adjustments 1 & 2: Added onclick, title, cursor-pointer, and scrollToUser logic
+                // Pass name safely to scrollToUser (escape single quotes)
+                const safeName = u.name.replace(/'/g, "\\'");
+
+                rows += `
+                    <div onclick="scrollToUser('${safeName}')" class="cursor-pointer flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition" title="點擊跳轉到工作項目">
+                        <div class="font-bold text-sm text-slate-700 truncate w-32 shrink-0" title="${u.name}">${displayLabel}</div>
+                        <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+                             <div class="${barColor} h-2 rounded-full" style="width: ${width}%"></div>
+                        </div>
+                        <div class="font-mono text-sm font-bold ${hoursClass} w-12 text-right">${u.totalHours.toFixed(1)}</div>
+                    </div>
+                `;
+            });
+            container.innerHTML = rows;
+        }
+
+        // --- MERGE LOGIC ---
+        function handleMergeButtonClick() {
+            const btn = document.getElementById('btnMergeAction');
+            const span = btn.querySelector('span');
+            const cancelBtn = document.getElementById('btnCancelMerge');
+            const thCheckbox = document.getElementById('thCheckbox');
+            const hint = document.getElementById('mergeHint');
+
+            if (!isMergeMode) {
+                // Enter Merge Mode
+                isMergeMode = true;
+                span.innerText = "合併選取項目";
+                cancelBtn.classList.remove('hidden');
+                thCheckbox.classList.remove('hidden');
+                hint.classList.remove('hidden');
+                // Re-render to show checkboxes
+                renderData();
+            } else {
+                // Execute Merge Action -> OPEN MODAL
+                openMergeDialog();
+            }
+        }
+
+        function cancelMergeMode() {
+            const btn = document.getElementById('btnMergeAction');
+            const span = btn.querySelector('span');
+            const cancelBtn = document.getElementById('btnCancelMerge');
+            const thCheckbox = document.getElementById('thCheckbox');
+            const hint = document.getElementById('mergeHint');
+
+            isMergeMode = false;
+            span.innerText = "合併設定";
+            cancelBtn.classList.add('hidden');
+            thCheckbox.classList.add('hidden');
+            hint.classList.add('hidden');
+            renderData();
+        }
+
+        // --- CUSTOM MODAL LOGIC (MERGE) ---
+        function openMergeDialog() {
+            const checkboxes = document.querySelectorAll('.proj-checkbox:checked');
+            if (checkboxes.length < 2) {
+                return showToast('請至少勾選兩個專案進行合併');
+            }
+
+            const selectedNames = Array.from(checkboxes).map(cb => cb.value);
+            const defaultName = selectedNames[0];
+
+            // Populate Modal
+            document.getElementById('mergeNameInput').value = defaultName;
+            const listEl = document.getElementById('mergeListPreview');
+            listEl.innerHTML = selectedNames.map(name => `<li>${name}</li>`).join('');
+
+            // Show Modal
+            document.getElementById('mergeDialogOverlay').classList.remove('hidden');
+            document.getElementById('mergeNameInput').focus();
+        }
+
+        function closeMergeDialog() {
+            document.getElementById('mergeDialogOverlay').classList.add('hidden');
+        }
+
+        function confirmMerge() {
+            const newName = document.getElementById('mergeNameInput').value;
+            if (!newName || !newName.trim()) {
+                alert('請輸入合併後的名稱');
+                return;
+            }
+
+            const checkboxes = document.querySelectorAll('.proj-checkbox:checked');
+            const selectedNames = Array.from(checkboxes).map(cb => cb.value);
+
+            // Resolve actual original names from selected aliases (in case user merges already merged groups)
+            let actualOriginals = [];
+            
+            selectedNames.forEach(name => {
+                // Check if this 'name' is an alias for an existing rule
+                const existingRuleIndex = globalSettings.projectMerges.findIndex(r => r.alias === name);
+                
+                if (existingRuleIndex > -1) {
+                    // It's an existing merged group, grab its originals and remove the old rule
+                    actualOriginals.push(...globalSettings.projectMerges[existingRuleIndex].originals);
+                    globalSettings.projectMerges.splice(existingRuleIndex, 1);
+                } else {
+                    // It's a raw project name
+                    actualOriginals.push(name);
+                }
+            });
+
+            // Create new rule
+            globalSettings.projectMerges.push({
+                alias: newName.trim(),
+                originals: actualOriginals
+            });
+
+            saveGlobalSettings();
+            
+            closeMergeDialog();
+            cancelMergeMode(); // Exit merge mode and refresh
+            showToast('合併成功！可至「控制台」管理規則');
+        }
+
+        function renderProjectStats(userList) {
+            // Check visibility
+            const canvas = document.getElementById('projectPieChart');
+            if (!canvas || canvas.offsetParent === null) {
+                // If hidden, destroy instance to prevent leaks/errors and return
+                if (projectChartInstance) {
+                    projectChartInstance.destroy();
+                    projectChartInstance = null;
+                }
+                return; 
+            }
+
+            // Flatten tasks from all filtered users
+            let allTasks = [];
+            userList.forEach(u => allTasks.push(...u.tasks));
+            
+            if (allTasks.length === 0) {
+                 document.getElementById('projectTableBody').innerHTML = '';
+                 if (projectChartInstance) projectChartInstance.destroy();
+                 return;
+            }
+
+            // Aggregate hours by project (Applying Merges)
+            const counts = {};
+            let total = 0;
+
+            allTasks.forEach(t => {
+                let p = t.project || '未分類';
+                
+                // Check if this project name matches any original name in merge rules
+                const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(p));
+                if (mergeRule) {
+                    p = mergeRule.alias; // Use the alias
+                }
+
+                counts[p] = (counts[p] || 0) + t.hours;
+                total += t.hours;
+            });
+
+            // Convert to array and sort by hours desc
+            const dataArr = Object.keys(counts).map(k => ({
+                name: k,
+                hours: counts[k],
+                percent: (counts[k] / total * 100).toFixed(1)
+            })).sort((a, b) => b.hours - a.hours);
+
+            // Render Table (With Conditional Checkboxes)
+            const tbody = document.getElementById('projectTableBody');
+            
+            // Handle header visibility based on isMergeMode
+            const thCheckbox = document.getElementById('thCheckbox');
+            if (isMergeMode) thCheckbox.classList.remove('hidden');
+            else thCheckbox.classList.add('hidden');
+
+            tbody.innerHTML = dataArr.map((d, i) => {
+                // Safely escape quotes for value attribute
+                const safeName = d.name.replace(/"/g, '&quot;');
+                return `
+                <tr class="hover:bg-slate-50 border-b border-slate-100 last:border-0 group">
+                    <td class="px-3 py-2 text-center ${isMergeMode ? '' : 'hidden'}">
+                        <input type="checkbox" class="proj-checkbox rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer" value="${safeName}">
+                    </td>
+                    <td class="px-3 py-2 font-bold text-slate-700 flex items-center">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background-color: ${getColor(i)}"></span>
+                        <span class="truncate max-w-[120px]" title="${d.name}">${d.name}</span>
+                    </td>
+                    <td class="px-3 py-2 text-right font-mono">${d.hours.toFixed(1)}</td>
+                    <td class="px-3 py-2 text-right font-mono text-slate-400">${d.percent}%</td>
+                </tr>
+            `}).join('');
+
+            // Render Chart using Chart.js
+            const ctx = document.getElementById('projectPieChart').getContext('2d');
+            
+            if (projectChartInstance) {
+                projectChartInstance.destroy();
+            }
+
+            projectChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: dataArr.map(d => d.name),
+                    datasets: [{
+                        data: dataArr.map(d => d.hours),
+                        backgroundColor: dataArr.map((_, i) => getColor(i)),
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) label += ': ';
+                                    let value = context.parsed.toFixed(1);
+                                    let percentage = (context.parsed / total * 100).toFixed(1) + '%';
+                                    return label + value + 'hr (' + percentage + ')';
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%',
+                    layout: { padding: 10 }
+                }
+            });
+        }
+
+        // Toggle all checkboxes
+        function toggleAllProjectCheckboxes(source) {
+            const checkboxes = document.querySelectorAll('.proj-checkbox');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+        }
+
+        // --- GROUP RULE LOGIC ---
+        function addGroupRule() {
+            const aliasInput = document.getElementById('newGroupAlias');
+            const sourceInput = document.getElementById('newGroupSources');
+            
+            const alias = aliasInput.value.trim();
+            const sourcesRaw = sourceInput.value.trim();
+
+            if (!alias || !sourcesRaw) {
+                return showToast('請填寫完整資訊');
+            }
+
+            const sources = sourcesRaw.split(/[,\s，]+/).filter(s => s.trim() !== '');
+            if (sources.length === 0) return showToast('請輸入至少一個原始名稱');
+
+            globalSettings.groupMerges.unshift({
+                alias: alias,
+                originals: sources
+            });
+
+            saveGlobalSettings();
+            
+            // Clear inputs
+            aliasInput.value = '';
+            sourceInput.value = '';
+            showToast('來源規則已新增');
+        }
+
+        function deleteGroupRule(index) {
+            ruleToDeleteIndex = index;
+            deleteType = 'group';
+            document.getElementById('confirmDialogOverlay').classList.remove('hidden');
+        }
+
+        function deleteProjectRule(index) {
+            ruleToDeleteIndex = index;
+            deleteType = 'project';
+            document.getElementById('confirmDialogOverlay').classList.remove('hidden');
+        }
+
+        // --- EDIT PROJECT RULE LOGIC (New) ---
+        function openEditProjectRule(index) {
+            ruleToEditIndex = index;
+            const rule = globalSettings.projectMerges[index];
+            if (!rule) return;
+
+            // Pre-fill input
+            const input = document.getElementById('editAliasInput');
+            input.value = rule.alias;
+            
+            document.getElementById('editDialogOverlay').classList.remove('hidden');
+            input.focus();
+        }
+
+        function closeEditDialog() {
+            document.getElementById('editDialogOverlay').classList.add('hidden');
+            ruleToEditIndex = -1;
+        }
+
+        function saveEditedProjectRule() {
+            if (ruleToEditIndex === -1) return;
+            
+            const input = document.getElementById('editAliasInput');
+            const newAlias = input.value.trim();
+            
+            if (!newAlias) {
+                return alert('請輸入名稱');
+            }
+
+            // Update
+            globalSettings.projectMerges[ruleToEditIndex].alias = newAlias;
+            saveGlobalSettings();
+            
+            // Refresh
+            closeEditDialog();
+            renderData(); // Make sure pie chart updates immediately if on overview
+            showToast('名稱已更新');
+        }
+
+        function executeDeleteRule() {
+            if (ruleToDeleteIndex === -1) return;
+            
+            if (deleteType === 'project') {
+                globalSettings.projectMerges.splice(ruleToDeleteIndex, 1);
+            } else if (deleteType === 'group') {
+                globalSettings.groupMerges.splice(ruleToDeleteIndex, 1);
+            }
+            
+            saveGlobalSettings();
+            
+            renderData();
+            
+            closeConfirmDialog();
+            showToast('已刪除規則');
+        }
+
+        function closeConfirmDialog() {
+            document.getElementById('confirmDialogOverlay').classList.add('hidden');
+            ruleToDeleteIndex = -1;
+            deleteType = '';
+        }
+
+        function renderSettingsTab() {
+            // Render Project Rules (Updated with Edit Button)
+            const projContainer = document.getElementById('mergeRulesContainer');
+            const noProjMsg = document.getElementById('noRulesMsg');
+            
+            if (globalSettings.projectMerges.length === 0) {
+                projContainer.innerHTML = '';
+                noProjMsg.classList.remove('hidden');
+            } else {
+                noProjMsg.classList.add('hidden');
+                projContainer.innerHTML = globalSettings.projectMerges.map((rule, index) => `
+                    <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-bold text-slate-700">${rule.alias}</span>
+                                <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">專案合併</span>
+                            </div>
+                            <div class="text-xs text-slate-400 leading-relaxed break-all">
+                                包含: ${rule.originals.join(', ')}
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <button onclick="openEditProjectRule(${index})" class="text-slate-400 hover:text-indigo-600 p-2 transition" title="編輯名稱">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="deleteProjectRule(${index})" class="text-slate-400 hover:text-rose-500 p-2 transition" title="刪除規則">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Render Group Rules
+            const groupContainer = document.getElementById('groupRulesContainer');
+            groupContainer.innerHTML = globalSettings.groupMerges.map((rule, index) => `
+                <div class="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                    <div class="flex-1 overflow-hidden">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-emerald-700">${rule.alias}</span>
+                            <span class="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">組別</span>
+                        </div>
+                        <div class="text-xs text-slate-400 truncate" title="${rule.originals.join(', ')}">
+                            ${rule.originals.join(', ')}
+                        </div>
+                    </div>
+                    <button onclick="deleteGroupRule(${index})" class="text-slate-300 hover:text-rose-500 p-2 ml-1 transition" title="刪除規則">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderDetailList(userList) {
+            const container = document.getElementById('detailView');
+            container.innerHTML = '';
+            
+            if (userList.length === 0) {
+                 container.innerHTML = `<div class="p-4 text-center text-slate-400 border border-slate-200 rounded-lg bg-white/50"><i class="fa-solid fa-filter text-lg mr-2"></i> 目前篩選條件下無匹配資料。</div>`;
+                 document.getElementById('analysisSection').classList.add('hidden');
+                 return;
+            }
+            
+            document.getElementById('analysisSection').classList.remove('hidden');
+
+            userList.forEach(u => {
+                let hoursColor = 'bg-emerald-100 text-emerald-800';
+                if (u.totalHours < 8) hoursColor = 'bg-amber-100 text-amber-800';
+                if (u.totalHours > 10) hoursColor = 'bg-rose-100 text-rose-800';
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
+                
+                // Add ID for anchor scroll (Adjustment 2)
+                card.id = getUserId(u.name);
+
+                // Clean Name & Group for Card Header
+                const shortName = cleanAuthorName(u.name);
+                
+                let tasksHtml = u.tasks.map(t => {
+                    // Logic for Link Button
+                    let linkHtml = '';
+                    if (t.link && t.link.startsWith('http')) {
+                         linkHtml = `
+                            <div class="mt-2 text-right">
+                                <a href="${t.link}" target="_blank" class="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 hover:text-indigo-800 transition font-bold border border-indigo-100">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> 開啟連結
+                                </a>
+                            </div>
+                         `;
+                    }
+
+                    return `
+                    <div class="border-b border-slate-100 last:border-0">
+                        <button class="accordion-btn w-full text-left p-2 flex items-center justify-between hover:bg-slate-50 transition group focus:outline-none" onclick="toggleTask(this)" aria-expanded="false">
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 pr-4">
+                                <span class="text-[10px] text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded border border-slate-100" title="專案">${t.project}</span>
+                                <span class="text-sm font-bold text-slate-700 font-mono" title="議題ID">${t.issue}</span>
+                                <span class="text-xs font-bold text-corp-600 font-mono ml-auto md:ml-2" title="時數">: ${t.hours}hr</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-down text-slate-300 text-xs accordion-icon group-hover:text-corp-600"></i>
+                        </button>
+                        <div class="accordion-content bg-slate-50/50">
+                            <div class="text-xs leading-relaxed pl-1 pt-2 border-t border-slate-100 border-dashed mx-3 mb-2 text-slate-600 whitespace-pre-line">
+                                ${formatContent(t.content)}
+                            </div>
+                            <div class="px-3 pb-2">
+                                ${linkHtml}
+                            </div>
+                        </div>
+                    </div>
+                `}).join('');
+
+                card.innerHTML = `
+                    <div class="p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
+                        <div class="flex flex-col items-center">
+                            <div class="text-[10px] text-slate-400 font-bold mb-0.5">${u.group}</div>
+                            <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap truncate w-full px-1" title="${u.name}">
+                                ${shortName}
+                            </div>
+                        </div>
+                        <div class="px-2 py-0.5 rounded-full text-[10px] font-bold ${hoursColor} mt-1">${u.totalHours.toFixed(1)}h</div>
+                    </div>
+                    <div class="flex-1 bg-white flex flex-col">${tasksHtml}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function formatContent(text) {
+             if (!text) return '(無內容)';
+             // Simple highlight logic
+             return text.replace(/(測試內容|工作事項|問題回報)/g, '<span class="font-bold text-slate-800">$1</span>');
+        }
+
+        function toggleTask(btn) {
+            const container = btn.parentElement;
+            const content = container.querySelector('.accordion-content');
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            btn.setAttribute('aria-expanded', !isExpanded);
+            if (!isExpanded) {
+                content.classList.add('expanded', 'p-3', 'pt-0');
+            } else {
+                content.classList.remove('expanded', 'p-3', 'pt-0');
+            }
+        }
+
+        // --- HISTORY & DATA MANAGER ---
+        function loadReportByDate(date) {
+            currentReportDate = date;
+            document.getElementById('reportDatePicker').value = date;
+            updateHistoryList();
+
+            const db = getDB();
+            let data = db[date];
+
+            if (!data) {
+                currentDailyData.rows = [];
+            } else {
+                if (data.rows) {
+                    currentDailyData = data;
+                } else {
+                    currentDailyData.rows = [];
+                }
+            }
+            
+            // Auto switch to overview if data exists, else source
+            if (currentDailyData.rows.length > 0) switchTab('OVERVIEW');
+            else switchTab('SOURCE');
+        }
+
+        // Renamed function and updated logic to switch to previous day
+        function switchToPreviousDay() {
+            const currentDate = currentReportDate;
+            
+            // Create a Date object from the current report date. Using 'T00:00:00' for timezone safety.
+            const dateObj = new Date(currentDate + 'T00:00:00');
+            
+            // Subtract one day (JS handles month/year rollover automatically)
+            dateObj.setDate(dateObj.getDate() - 1); 
+            
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const prevDayISO = `${year}-${month}-${day}`;
+            
+            loadReportByDate(prevDayISO);
+            showToast(`已切換至前日 (${prevDayISO})`);
+        }
+
+        function switchToNextDay() {
+            const currentDate = currentReportDate;
+            const dateObj = new Date(currentDate + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() + 1);
+            
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const nextDayISO = `${year}-${month}-${day}`;
+            
+            loadReportByDate(nextDayISO);
+            showToast(`已切換至後日 (${nextDayISO})`);
+        }
+
+        function handleDateChange() {
+            const newDate = document.getElementById('reportDatePicker').value;
+            if(newDate) loadReportByDate(newDate);
+        }
+
+        function saveCurrentReport() {
+            const date = document.getElementById('reportDatePicker').value;
+            if(!date) return showToast('請選擇日期');
+            const db = getDB();
+            db[date] = currentDailyData;
+            saveDB(db);
+            showToast('資料已儲存');
+        }
+
+        function updateHistoryList() {
+            const db = getDB();
+            const dates = Object.keys(db).sort().reverse(); 
+            const listEl = document.getElementById('historyList');
+            listEl.innerHTML = '';
+            if(dates.length === 0) {
+                listEl.innerHTML = '<div class="text-xs text-slate-400 p-2 text-center">尚無紀錄</div>';
+                return;
+            }
+            dates.forEach(date => {
+                const item = document.createElement('div');
+                item.className = `p-2 rounded cursor-pointer text-sm flex justify-between items-center hover:bg-slate-50 transition ${date === currentReportDate ? 'active-date' : 'text-slate-600'}`;
+                item.onclick = () => loadReportByDate(date);
+                item.innerHTML = `<span><i class="fa-regular fa-calendar mr-2 opacity-50"></i>${date}</span>`;
+                listEl.appendChild(item);
+            });
+        }
+
+        function clearAllData() {
+            if (window.confirm('警告：確定要清空所有歷史紀錄嗎？')) {
+                localStorage.removeItem(DB_KEY);
+                const today = new Date().toISOString().split('T')[0];
+                loadReportByDate(today);
+                showToast('所有資料已清空');
+            }
+        }
+
+        function exportData() {
+            const db = getDB();
+            if (Object.keys(db).length === 0) return showToast('無資料可備份');
+            const dataStr = JSON.stringify(db, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `daily_report_v6_public_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    saveDB(data);
+                    loadReportByDate(currentReportDate);
+                    showToast('資料還原成功');
+                } catch (error) {
+                    showToast('檔案格式錯誤');
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
