@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>團隊日報管理系統 (GS瀏覽版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js for Pie Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        corp: { 50: '#f0f9ff', 100: '#e0f2fe', 600: '#0284c7', 800: '#075985' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        
+        /* Sidebar Item States */
+        .date-item { 
+            @apply p-2 rounded-lg cursor-pointer text-sm flex justify-between items-center transition border border-transparent;
+        }
+        .date-item:hover { @apply bg-slate-100 text-slate-700; }
+        .date-item.active { 
+            @apply bg-corp-50 border-corp-600 text-corp-800 font-bold shadow-sm; 
+            border-left-width: 4px;
+        }
+        
+        /* Button Styles */
+        .header-tab-btn { 
+            @apply px-4 py-2 text-sm font-bold rounded-lg transition-all duration-200 flex items-center gap-2 text-slate-500 whitespace-nowrap relative border border-transparent flex-1 justify-center md:flex-none; 
+        }
+        
+        /* State: Hover */
+        .header-tab-btn:hover:not(.active) {
+            @apply bg-slate-100 text-slate-700;
+        }
+
+        /* State: Active (Selected) - High Contrast */
+        .header-tab-btn.active { 
+            @apply bg-corp-600 text-white shadow-md; 
+        }
+
+        /* Filter Button Styles */
+        .filter-btn {
+            @apply text-[10px] font-bold px-2 py-1 rounded transition bg-slate-100 text-slate-600 hover:bg-corp-100 hover:text-corp-600 border border-transparent;
+        }
+        .filter-btn.active {
+            @apply bg-corp-600 text-white border-corp-600;
+        }
+
+        /* Accordion transition */
+        .accordion-content {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .accordion-content.expanded {
+            max-height: 1000px; 
+            opacity: 1;
+        }
+        .accordion-icon {
+            transition: transform 0.3s ease;
+        }
+        .accordion-btn[aria-expanded="true"] .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+
+        /* Highlight animation for anchor jump */
+        @keyframes highlight-fade {
+            0% { background-color: #fef3c7; transform: scale(1.02); }
+            50% { background-color: #fef3c7; transform: scale(1.02); }
+            100% { background-color: white; transform: scale(1); }
+        }
+        .highlight-card {
+            animation: highlight-fade 2s ease-out;
+        }
+
+    </style>
+</head>
+<body class="bg-slate-100 h-screen overflow-hidden text-slate-800 flex">
+
+    <!-- Sidebar: Date Navigation -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20 hidden md:flex transition-all duration-300" id="mainSidebar">
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+            <div>
+                <h1 class="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-corp-600"></i> 日報瀏覽器
+                </h1>
+                <p class="text-xs text-slate-400 mt-1">Google Sheet 同步版</p>
+            </div>
+            <!-- Mobile close button -->
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Sidebar Controls -->
+        <div class="p-3 bg-slate-50 border-b border-slate-100">
+            <button onclick="fetchAllData()" id="sidebarSyncBtn" class="w-full bg-corp-600 hover:bg-corp-800 text-white py-2 px-3 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-arrows-rotate"></i> 重整 / 同步資料
+            </button>
+            <div class="mt-2 text-[10px] text-center text-slate-400" id="lastSyncTime">
+                尚未同步
+            </div>
+            <!-- Auto Refresh Indicator -->
+            <div id="autoRefreshStatus" class="hidden mt-1 text-[10px] text-center text-emerald-600 font-bold bg-emerald-50 rounded py-0.5">
+                <i class="fa-solid fa-clock-rotate-left mr-1"></i> 自動刷新開啟中
+            </div>
+        </div>
+
+        <!-- Date List Container -->
+        <div class="flex-1 overflow-y-auto custom-scroll px-3 py-2">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">日期清單 (依最新排序)</h3>
+            <div id="dateNavigator" class="space-y-1">
+                <!-- JS Populated: Will show list of dates found in Sheet -->
+                <div class="text-xs text-slate-400 p-4 text-center italic">
+                    請點擊「重整 / 同步資料」<br>以讀取表格內容
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-200 bg-slate-50">
+            <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">資料管理</h3>
+            <div class="flex gap-2">
+                <button onclick="exportData()" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition" title="匯出 JSON">
+                    <i class="fa-solid fa-download"></i> 備份
+                </button>
+                <label class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition text-center cursor-pointer" title="匯入 JSON">
+                    <i class="fa-solid fa-upload"></i> 還原
+                    <input type="file" id="importFile" class="hidden" onchange="importData(this)" accept=".json">
+                </label>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full" id="mainContentScroll">
+        
+        <!-- Toolbar Header -->
+        <header class="bg-white border-b border-slate-200 p-3 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm z-10 shrink-0 gap-4 md:gap-0">
+            <div class="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 custom-scroll no-scrollbar">
+                <!-- Mobile Menu Toggle -->
+                <button onclick="toggleSidebar()" class="md:hidden text-slate-500 hover:text-slate-800 p-1">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+
+                <!-- Current Display Date Info -->
+                <div class="flex flex-col mr-2 shrink-0">
+                    <label class="text-[10px] text-slate-400 font-bold uppercase leading-none mb-1">目前顯示日期</label>
+                    <div id="currentDisplayDate" class="font-bold text-lg text-slate-800 tracking-tight">
+                        ----/--/--
+                    </div>
+                </div>
+
+                <div class="hidden md:block h-8 w-px bg-slate-200 mx-2 shrink-0"></div>
+
+                <!-- Tabs -->
+                <div class="flex items-center bg-slate-100 rounded-lg p-1 shrink-0 w-full md:w-auto">
+                    <button onclick="switchTab('OVERVIEW')" id="tab-OVERVIEW" class="header-tab-btn active">
+                        <i class="fa-solid fa-chart-pie"></i> 總覽報表
+                    </button>
+                    <button onclick="switchTab('ANALYSIS')" id="tab-ANALYSIS" class="header-tab-btn">
+                        <i class="fa-solid fa-chart-line"></i> 趨勢分析
+                    </button>
+                    <button onclick="switchTab('SOURCE')" id="tab-SOURCE" class="header-tab-btn">
+                        <i class="fa-solid fa-table"></i> 資料來源
+                    </button>
+                    <button onclick="switchTab('SETTINGS')" id="tab-SETTINGS" class="header-tab-btn hidden md:flex">
+                        <i class="fa-solid fa-sliders"></i> 控制台
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Actions -->
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end mt-2 md:mt-0 shrink-0">
+                <div id="headerTotalManHours" class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full font-bold whitespace-nowrap">
+                    尚未計算
+                </div>
+                <!-- Refresh Button -->
+                <button onclick="fetchAllData()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> <span class="hidden md:inline">重整</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6 bg-slate-50" id="scrollContainer">
+            
+            <!-- Source Settings Tab -->
+            <section id="sourceSection" class="hidden max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                             <i class="fa-brands fa-google-drive"></i>
+                        </span>
+                        Google Sheet 來源設定
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-600 mb-1">Google Sheet ID (試算表 ID)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入 ID 例如: 168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo">
+                                </div>
+                            </div>
+                            <!-- Auto Refresh Setting -->
+                            <div>
+                                <label class="block text-sm font-bold text-slate-600 mb-1">自動刷新間隔 (分鐘)</label>
+                                <div class="flex gap-2 items-center">
+                                    <input type="number" id="autoRefreshInput" class="w-24 border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="0" min="0">
+                                    <span class="text-xs text-slate-400 font-bold">(輸入 0 代表關閉)</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-xs text-slate-400">
+                            <i class="fa-solid fa-circle-info mr-1"></i>
+                            請確保試算表權限已設為「知道連結者皆可檢視」，系統將透過公開模式讀取。
+                        </p>
+
+                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">欄位對應 (Column Index: A=0, B=1, C=2...)</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">日期 (Date)</label>
+                                    <input type="number" id="colDate" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-emerald-600">組別 (Group)</label>
+                                    <input type="number" id="colGroup" class="w-full border border-emerald-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-emerald-50 text-emerald-700" value="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">填寫者 (Author)</label>
+                                    <input type="number" id="colName" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">專案 (Project)</label>
+                                    <input type="number" id="colProj" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="3">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">議題 (Issue)</label>
+                                    <input type="number" id="colId" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="4">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">回應 (Response)</label>
+                                    <input type="number" id="colContent" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="5">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1">小時 (Hours)</label>
+                                    <input type="number" id="colHours" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="6">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-indigo-600">連結 (Link)</label>
+                                    <input type="number" id="colLink" class="w-full border border-indigo-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-indigo-50 text-indigo-700" value="7">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 flex justify-end">
+                            <button onclick="fetchAllData()" class="bg-corp-600 hover:bg-corp-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg transition flex items-center gap-2 transform hover:-translate-y-0.5">
+                                <i class="fa-solid fa-check"></i> 儲存設定並同步資料
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Trend Tab -->
+            <section id="analysisTabSection" class="hidden max-w-5xl mx-auto space-y-6">
+                <!-- ... Same as before, logic will use global data ... -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+                        <h2 class="font-bold text-slate-700 text-lg flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                                 <i class="fa-solid fa-chart-line"></i>
+                            </span>
+                            趨勢分析
+                        </h2>
+                        
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <div class="flex bg-slate-100 p-1 rounded-lg">
+                                <button onclick="setAnalysisMode('PROJECT')" id="btnModeProject" class="px-3 py-1.5 text-xs font-bold rounded-md transition bg-white text-corp-600 shadow-sm">專案視角</button>
+                                <button onclick="setAnalysisMode('PERSON')" id="btnModePerson" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">人員比對</button>
+                                <button onclick="setAnalysisMode('GROUP')" id="btnModeGroup" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">組別視角</button>
+                            </div>
+                            <!-- Reset Buttons -->
+                            <button id="btnResetPerson" onclick="resetPersonSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> 重置人員全選
+                            </button>
+                            <button id="btnResetProject" onclick="resetProjectSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> 重置專案全選
+                            </button>
+                            
+                            <select id="analysisDays" onchange="renderTrendAnalysis()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:border-corp-600 cursor-pointer">
+                                <option value="7">最近 7 天</option>
+                                <option value="14">最近 14 天</option>
+                                <option value="30">最近 30 天</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Filter Hint -->
+                    <div id="trendFilterHint" class="hidden mb-4 bg-corp-50 border border-corp-100 text-corp-800 px-4 py-2 rounded-lg text-sm flex justify-between items-center">
+                        <span id="trendFilterText" class="font-bold"></span>
+                        <button onclick="clearTrendFilter()" class="text-xs bg-white border border-corp-200 hover:bg-corp-100 px-3 py-1 rounded text-corp-600 transition">
+                            <i class="fa-solid fa-xmark mr-1"></i> 取消聚焦
+                        </button>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="relative h-80 w-full mb-8">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+
+                    <!-- Entity Selector -->
+                    <div id="entitySelectionArea" class="hidden mb-6 space-y-3">
+                        <div id="selectedEntityContainer" class="hidden"></div>
+                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <h4 id="entitySelectionTitle" class="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
+                                <i class="fa-solid fa-plus-circle"></i> 點擊加入比對
+                            </h4>
+                            <div id="unselectedEntityContainer" class="flex flex-col gap-3 max-h-48 overflow-y-auto custom-scroll p-1"></div>
+                        </div>
+                    </div>
+
+                    <!-- Legend Hint -->
+                    <div id="chartLegendHint" class="bg-orange-50 border border-orange-100 rounded-lg p-3 text-xs text-orange-800 mb-6 flex items-start gap-2">
+                        <i class="fa-solid fa-lightbulb mt-0.5"></i>
+                        <p>此圖表顯示所選期間內的工時堆疊變化。點擊圖表中的「長條圖區塊」可操作聚焦或移除。</p>
+                    </div>
+
+                    <!-- Trend Table -->
+                    <div class="overflow-x-auto">
+                        <h3 class="font-bold text-slate-600 text-sm mb-3 pl-1 border-l-4 border-corp-600">詳細數據 (小時)</h3>
+                        <table class="w-full text-xs text-left text-slate-600" id="trendTable"></table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Tab -->
+            <section id="settingsSection" class="hidden max-w-4xl mx-auto space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                             <i class="fa-solid fa-sliders"></i>
+                        </span>
+                        控制台 (全局設定)
+                    </h2>
+                    
+                    <!-- Group Merges -->
+                    <div class="space-y-4 mb-8">
+                        <div class="flex flex-col md:flex-row justify-between md:items-end pb-2 border-b border-slate-100 gap-2">
+                             <div>
+                                 <h3 class="font-bold text-slate-600 text-sm">來源彈性設定 (組別合併)</h3>
+                                 <p class="text-xs text-slate-400">設定 Google Sheet 原始組別名稱如何對應到系統顯示的組別。</p>
+                             </div>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col md:flex-row gap-2 items-start md:items-center">
+                            <input type="text" id="newGroupAlias" placeholder="顯示名稱 (如: 網頁)" class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:w-1/4 focus:outline-none focus:border-indigo-500">
+                            <input type="text" id="newGroupSources" placeholder="原始名稱 (逗號分隔, 如: 網頁組,網頁)" class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:flex-1 focus:outline-none focus:border-indigo-500">
+                            <button onclick="addGroupRule()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm whitespace-nowrap w-full md:w-auto">
+                                <i class="fa-solid fa-plus"></i> 新增
+                            </button>
+                        </div>
+                        <div id="groupRulesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                    </div>
+
+                    <!-- Project Merges -->
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-end pb-2 border-b border-slate-100">
+                             <div>
+                                <h3 class="font-bold text-slate-600 text-sm">專案合併規則</h3>
+                                <p class="text-xs text-slate-400">這些規則會自動將多個專案名稱合併為一個，影響工時統計圖表。</p>
+                             </div>
+                        </div>
+                        <div id="mergeRulesContainer" class="space-y-2"></div>
+                        <div id="noRulesMsg" class="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                             尚未設定合併規則。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Overview Tab (Dashboard) -->
+            <section id="overviewSection" class="pb-12">
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden flex flex-col items-center justify-center py-12 text-slate-400">
+                    <i class="fa-regular fa-folder-open text-5xl mb-3 opacity-30"></i>
+                    <p class="text-sm">尚未選擇日期，請點擊左側列表。</p>
+                </div>
+
+                <!-- Anchor for Result -->
+                <a id="resultAnchor"></a> 
+                
+                <!-- Detail List -->
+                <div id="resultSection" class="hidden space-y-4 mt-2">
+                    
+                    <!-- Header with Filter Buttons -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-2 gap-2">
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <h3 class="font-bold text-slate-700 text-lg flex items-center gap-2 shrink-0">
+                                <i class="fa-solid fa-list-check text-slate-400"></i> 彙整結果
+                            </h3>
+                            <div id="groupFilterButtons" class="flex flex-wrap gap-1.5 pt-1">
+                                <button class="filter-btn active" data-group="ALL" onclick="filterByGroup('ALL')">全部</button>
+                                <button class="filter-btn" data-group="品檢" onclick="filterByGroup('品檢')">品檢</button>
+                                <button class="filter-btn" data-group="網頁" onclick="filterByGroup('網頁')">網頁</button>
+                                <button class="filter-btn" data-group="資料庫" onclick="filterByGroup('資料庫')">資料庫</button>
+                                <button class="filter-btn" data-group="客服" onclick="filterByGroup('客服')">客服</button>
+                                <button class="filter-btn" data-group="技術" onclick="filterByGroup('技術')">技術</button>
+                            </div>
+                        </div>
+                        <button onclick="scrollToAnalysis()" class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap shrink-0 transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-chart-column mr-1"></i> 工時統計
+                        </button>
+                    </div>
+                    <div id="detailView" class="space-y-2"></div>
+                </div>
+
+                <!-- Dashboard Widgets -->
+                <a id="analysisAnchor"></a> 
+                <div id="analysisSection" class="hidden mt-6 space-y-6">
+                    
+                    <!-- Work Hours Chart -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col w-full">
+                        <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                            <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-2">
+                                <i class="fa-solid fa-clock"></i>
+                            </span>
+                            工時統計
+                            <span id="widgetTotalManHours" class="ml-auto text-xs bg-slate-100 px-2 py-1 rounded-full font-normal text-slate-500"></span>
+                        </h3>
+                        <div id="hoursGridContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto custom-scroll max-h-[500px]"></div>
+                    </div>
+
+                    <!-- Project Distribution Chart -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col w-full">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
+                            <h3 class="font-bold text-slate-700 flex items-center">
+                                <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-2">
+                                    <i class="fa-solid fa-chart-pie"></i>
+                                </span>
+                                專案工時佔比
+                            </h3>
+                            <div class="flex gap-2" id="mergeTools">
+                                <button id="btnCancelMerge" onclick="cancelMergeMode()" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                    <i class="fa-solid fa-xmark"></i> 取消
+                                </button>
+                                <button id="btnMergeAction" onclick="handleMergeButtonClick()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                    <i class="fa-solid fa-object-group"></i> <span>合併設定</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex flex-col md:flex-row gap-8 items-start">
+                            <div class="w-full md:w-1/3 relative h-56 flex items-center justify-center shrink-0">
+                                <canvas id="projectPieChart"></canvas>
+                            </div>
+                            <div class="w-full md:w-2/3 overflow-x-auto">
+                                 <table class="w-full text-sm text-left text-slate-600">
+                                     <thead class="text-xs text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                                         <tr>
+                                             <th id="thCheckbox" class="px-3 py-2 w-8 text-center hidden">
+                                                <input type="checkbox" onclick="toggleAllProjectCheckboxes(this)" class="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                             </th>
+                                             <th class="px-3 py-2">專案 (包含合併項目)</th>
+                                             <th class="px-3 py-2 text-right">工時</th>
+                                             <th class="px-3 py-2 text-right">比例</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody id="projectTableBody" class="divide-y divide-slate-100"></tbody>
+                                 </table>
+                                 <p id="mergeHint" class="hidden text-[10px] text-slate-400 mt-2 text-right text-indigo-600 font-bold bg-indigo-50 inline-block px-2 py-1 rounded ml-auto w-full md:w-auto">* 請勾選上方項目並點擊「合併選取項目」</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Modals (Merge, Delete, Edit) -->
+    <!-- Merge Dialog -->
+    <div id="mergeDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700">合併確認</h3>
+                <button onclick="closeMergeDialog()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">合併後的名稱</label>
+                    <input type="text" id="mergeNameInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="請輸入名稱">
+                </div>
+                <div class="bg-slate-50 rounded p-3 text-xs text-slate-600">
+                    <p class="font-bold mb-1 text-slate-500">即將合併以下項目：</p>
+                    <ul id="mergeListPreview" class="list-disc list-inside space-y-1 text-slate-500 max-h-32 overflow-y-auto"></ul>
+                </div>
+            </div>
+            <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
+                <button onclick="closeMergeDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="confirmMerge()" class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">確認合併</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirmDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-trash-can text-xl"></i>
+                </div>
+                <h3 class="font-bold text-slate-700 text-lg mb-2">移除規則</h3>
+                <p class="text-sm text-slate-500 mb-6">確定要刪除此規則嗎？</p>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="closeConfirmDialog()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition flex-1">取消</button>
+                    <button onclick="executeDeleteRule()" class="px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition flex-1 shadow-lg shadow-rose-200">確認刪除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Alias Modal -->
+    <div id="editDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700">編輯名稱</h3>
+                <button onclick="closeEditDialog()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <label class="block text-xs font-bold text-slate-500 mb-1">合併後的顯示名稱</label>
+                <input type="text" id="editAliasInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition">
+            </div>
+            <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
+                <button onclick="closeEditDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="saveEditedProjectRule()" class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
+
+    <!-- Floating Back to Result Button -->
+    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-5 right-5 md:bottom-10 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-10 h-10 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5">
+        <i class="fa-solid fa-arrow-up text-sm"></i>
+    </button>
+
+    <script>
+        // --- STORAGE & STATE MANAGER ---
+        const DB_KEY = 'daily_reports_db_v7_full_sync'; 
+        const SETTINGS_KEY = 'daily_reports_settings_v1';
+        
+        // GLOBAL DATA STORE
+        let globalAllSheetData = {}; 
+        let availableDates = []; 
+        let currentSelectedDate = ''; 
+
+        // Chart & UI State
+        let projectChartInstance = null;
+        let trendChartInstance = null;
+        let isMergeMode = false;
+        let ruleToDeleteIndex = -1;
+        let ruleToEditIndex = -1;
+        let deleteType = '';
+        let autoRefreshTimer = null; // Auto Refresh Timer Variable
+        
+        // Analysis State
+        let analysisMode = 'PROJECT'; 
+        let activeTrendFilter = null; 
+        let selectedPersons = new Set(); 
+        let shouldSelectAllPersons = false; 
+        let selectedProjects = new Set(); 
+        let shouldSelectAllProjects = true;
+        let currentTotalEntitiesCount = 0; 
+        
+        let globalConfig = {
+            sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
+            cols: { date: 0, group: 1, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
+        };
+        
+        const DEFAULT_GROUP_MERGES = [
+            { alias: '品檢', originals: ['品檢組', '品檢'] },
+            { alias: '技術', originals: ['技術', '技術組'] },
+            { alias: '網頁', originals: ['網頁組', '網頁'] },
+            { alias: '客服組', originals: ['客服組', '【客服組】'] }
+        ];
+
+        let globalSettings = { projectMerges: [], groupMerges: [], autoRefreshInterval: 0 };
+        let activeTab = 'OVERVIEW'; 
+        let activeFilterGroup = 'ALL'; 
+
+        const CHART_COLORS = [
+            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
+            '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6',
+            '#f43f5e', '#a855f7', '#0ea5e9', '#22c55e', '#eab308'
+        ];
+        function getColor(index) { return CHART_COLORS[index % CHART_COLORS.length]; }
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGlobalSettings();
+            setupAutoRefresh(); // Start Auto Refresh if configured
+            
+            // Try load data from local storage
+            const cachedDB = localStorage.getItem(DB_KEY);
+            if (cachedDB) {
+                try {
+                    const parsed = JSON.parse(cachedDB);
+                    globalAllSheetData = parsed.data || {};
+                    globalConfig = parsed.config || globalConfig;
+                    
+                    processDatesAndRenderSidebar();
+                    
+                    if (availableDates.length > 0) {
+                        selectDate(availableDates[0]);
+                    } else {
+                        switchTab('SOURCE');
+                    }
+                    
+                    document.getElementById('lastSyncTime').innerText = `上次同步: ${parsed.timestamp || '未知'}`;
+                } catch(e) { console.error("Cache load failed", e); switchTab('SOURCE'); }
+            } else {
+                switchTab('SOURCE');
+            }
+
+            const scrollContainer = document.getElementById('scrollContainer');
+            if (scrollContainer) scrollContainer.addEventListener('scroll', handleScroll);
+            
+            setAnalysisMode('PROJECT'); 
+        });
+
+        // --- GLOBAL SETTINGS ---
+        function loadGlobalSettings() {
+            const stored = localStorage.getItem(SETTINGS_KEY);
+            if (stored) {
+                globalSettings = JSON.parse(stored);
+                if (!globalSettings.projectMerges) globalSettings.projectMerges = [];
+                if (!globalSettings.groupMerges) globalSettings.groupMerges = JSON.parse(JSON.stringify(DEFAULT_GROUP_MERGES));
+                if (globalSettings.autoRefreshInterval === undefined) globalSettings.autoRefreshInterval = 0;
+            } else {
+                globalSettings.groupMerges = JSON.parse(JSON.stringify(DEFAULT_GROUP_MERGES));
+                globalSettings.autoRefreshInterval = 0;
+                saveGlobalSettings();
+            }
+        }
+
+        function saveGlobalSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(globalSettings));
+            renderSettingsTab();
+        }
+
+        // --- AUTO REFRESH LOGIC ---
+        function setupAutoRefresh() {
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            const minutes = parseInt(globalSettings.autoRefreshInterval);
+            const statusIndicator = document.getElementById('autoRefreshStatus');
+            
+            if (minutes > 0) {
+                console.log(`Auto refresh set for ${minutes} minutes`);
+                if(statusIndicator) {
+                    statusIndicator.classList.remove('hidden');
+                    statusIndicator.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1"></i> 自動刷新開啟中 (${minutes}m)`;
+                }
+                autoRefreshTimer = setInterval(() => {
+                    console.log("Triggering auto refresh...");
+                    fetchAllData(true); 
+                }, minutes * 60 * 1000);
+            } else {
+                if(statusIndicator) statusIndicator.classList.add('hidden');
+            }
+        }
+
+        // --- TAB LOGIC (Restored) ---
+        function switchTab(tab) {
+            activeTab = tab;
+
+            // UI Buttons
+            document.querySelectorAll('.header-tab-btn').forEach(btn => btn.classList.remove('active'));
+            const tabBtn = document.getElementById(`tab-${tab}`);
+            if(tabBtn) tabBtn.classList.add('active');
+            
+            // Sections
+            const sourceSec = document.getElementById('sourceSection');
+            const overviewSec = document.getElementById('overviewSection');
+            const settingsSec = document.getElementById('settingsSection');
+            const analysisSec = document.getElementById('analysisTabSection');
+
+            if(sourceSec) sourceSec.classList.add('hidden');
+            if(overviewSec) overviewSec.classList.add('hidden');
+            if(settingsSec) settingsSec.classList.add('hidden');
+            if(analysisSec) analysisSec.classList.add('hidden');
+
+            if (tab === 'OVERVIEW') {
+                if(overviewSec) overviewSec.classList.remove('hidden');
+                if (typeof renderData === 'function') renderData(); 
+            } else if (tab === 'ANALYSIS') {
+                if(analysisSec) analysisSec.classList.remove('hidden');
+                if (typeof renderTrendAnalysis === 'function') renderTrendAnalysis();
+            } else if (tab === 'SOURCE') {
+                if(sourceSec) sourceSec.classList.remove('hidden');
+                // Update config inputs from globalConfig
+                document.getElementById('gsheetId').value = globalConfig.sheetId || '';
+                document.getElementById('colDate').value = globalConfig.cols.date;
+                document.getElementById('colGroup').value = globalConfig.cols.group;
+                document.getElementById('colName').value = globalConfig.cols.name;
+                document.getElementById('colProj').value = globalConfig.cols.proj;
+                document.getElementById('colId').value = globalConfig.cols.id;
+                document.getElementById('colContent').value = globalConfig.cols.content;
+                document.getElementById('colHours').value = globalConfig.cols.hours;
+                document.getElementById('colLink').value = (globalConfig.cols.link !== undefined) ? globalConfig.cols.link : 7;
+                // Load Auto Refresh Input
+                document.getElementById('autoRefreshInput').value = globalSettings.autoRefreshInterval || 0;
+                
+                if (typeof updateRawPreview === 'function') updateRawPreview();
+            } else if (tab === 'SETTINGS') {
+                if(settingsSec) settingsSec.classList.remove('hidden');
+                if (typeof renderSettingsTab === 'function') renderSettingsTab();
+            }
+        }
+
+        // --- FETCH & PROCESS LOGIC (NEW CORE) ---
+        async function fetchAllData(isAuto = false) {
+            const btn = document.getElementById('sidebarSyncBtn');
+            const originalText = btn.innerHTML;
+            if(!isAuto) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 讀取中...';
+            }
+            
+            try {
+                // Read and save settings if manually triggered (usually implies user might have changed settings)
+                if(!isAuto) {
+                    const uiSheetId = document.getElementById('gsheetId').value.trim();
+                    if(uiSheetId) globalConfig.sheetId = uiSheetId;
+                    
+                    const refreshVal = parseInt(document.getElementById('autoRefreshInput').value) || 0;
+                    globalSettings.autoRefreshInterval = refreshVal;
+                    saveGlobalSettings();
+                    setupAutoRefresh(); // Restart timer
+                }
+                
+                const gvizUrl = `https://docs.google.com/spreadsheets/d/${globalConfig.sheetId}/gviz/tq?tqx=out:json`;
+                
+                const strategies = [
+                    { url: gvizUrl, name: 'Direct' },
+                    { url: `https://corsproxy.io/?${encodeURIComponent(gvizUrl)}`, name: 'CorsProxy' },
+                    { url: `https://api.allorigins.win/get?url=${encodeURIComponent(gvizUrl)}`, name: 'AllOrigins', wrapper: true }
+                ];
+
+                let json = null;
+                for (const strat of strategies) {
+                    try {
+                        const res = await fetch(strat.url);
+                        if (!res.ok) throw new Error('Network Error');
+                        let text = await res.text();
+                        if (strat.wrapper) {
+                            const data = JSON.parse(text);
+                            text = data.contents;
+                        }
+                        const start = text.indexOf('{');
+                        const end = text.lastIndexOf('}') + 1;
+                        if (start > -1 && end > -1) {
+                            json = JSON.parse(text.substring(start, end));
+                            break; 
+                        }
+                    } catch(e) { console.warn(e); }
+                }
+
+                if (!json || !json.table || !json.table.rows) throw new Error("無法讀取資料，請檢查權限或 ID");
+
+                const rawRows = json.table.rows;
+                const cols = globalConfig.cols;
+                const newDataByDate = {};
+
+                rawRows.forEach(row => {
+                    const c = row.c;
+                    if (!c) return;
+                    const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
+                    
+                    const dateRaw = getVal(cols.date);
+                    const cleanDate = parseDateFromValue(dateRaw);
+                    
+                    if (cleanDate) {
+                        if (!newDataByDate[cleanDate]) newDataByDate[cleanDate] = [];
+                        
+                        const name = String(getVal(cols.name)).trim();
+                        if (name) {
+                            const rawGroup = String(getVal(cols.group)).trim();
+                            const groupName = cleanGroupName(rawGroup);
+                            let proj = String(getVal(cols.proj)).trim().replace(/【.*?】/g, '').trim(); 
+                            const idVal = String(getVal(cols.id)).trim();
+                            const content = String(getVal(cols.content)).trim();
+                            const link = String(getVal(cols.link)).trim();
+                            const hrs = parseFloat(getVal(cols.hours)) || 0;
+
+                            newDataByDate[cleanDate].push({
+                                name, group: groupName, project: proj, issue: idVal, content, hours: hrs, link
+                            });
+                        }
+                    }
+                });
+
+                globalAllSheetData = newDataByDate;
+                
+                const now = new Date().toLocaleString('zh-TW');
+                localStorage.setItem(DB_KEY, JSON.stringify({
+                    timestamp: now,
+                    config: globalConfig,
+                    data: globalAllSheetData
+                }));
+                document.getElementById('lastSyncTime').innerText = `上次同步: ${now}`;
+
+                processDatesAndRenderSidebar();
+                
+                // Keep current selection if valid, else pick latest
+                if (currentSelectedDate && globalAllSheetData[currentSelectedDate]) {
+                    // Just update view
+                    if (activeTab === 'OVERVIEW') renderData();
+                    if (activeTab === 'ANALYSIS') renderTrendAnalysis();
+                } else if (availableDates.length > 0) {
+                    selectDate(availableDates[0]);
+                } 
+                
+                if(!isAuto) showToast(`同步完成！共讀取 ${Object.keys(globalAllSheetData).length} 天的資料`);
+                updateRawPreview();
+
+            } catch (e) {
+                if(!isAuto) alert("同步失敗: " + e.message);
+                console.error("Auto refresh failed", e);
+            } finally {
+                if(!isAuto) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            }
+        }
+
+        function parseDateFromValue(val) {
+            if (!val) return null;
+            const str = String(val);
+            const match = str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+            if (match) {
+                return `${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`;
+            }
+            return null; 
+        }
+
+        function processDatesAndRenderSidebar() {
+            availableDates = Object.keys(globalAllSheetData).sort().reverse();
+            
+            const listEl = document.getElementById('dateNavigator');
+            listEl.innerHTML = '';
+            
+            if (availableDates.length === 0) {
+                listEl.innerHTML = '<div class="text-xs text-slate-400 p-4 text-center">無資料</div>';
+                return;
+            }
+
+            availableDates.forEach(date => {
+                const count = globalAllSheetData[date].length;
+                const div = document.createElement('div');
+                div.className = `date-item ${date === currentSelectedDate ? 'active' : 'text-slate-600'}`;
+                div.onclick = () => selectDate(date);
+                div.innerHTML = `
+                    <span class="font-mono">${date}</span>
+                    <span class="text-[10px] bg-slate-200 text-slate-500 px-1.5 rounded-full">${count}</span>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+
+        function selectDate(date) {
+            currentSelectedDate = date;
+            
+            document.querySelectorAll('.date-item').forEach(el => {
+                if (el.innerText.includes(date)) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            document.getElementById('currentDisplayDate').innerText = date;
+            
+            if (activeTab === 'OVERVIEW') renderData();
+            if (activeTab === 'ANALYSIS') renderTrendAnalysis();
+        }
+
+        // --- CORE DATA GETTERS ---
+        function getCurrentDayRows() {
+            return globalAllSheetData[currentSelectedDate] || [];
+        }
+
+        // --- RENDER LOGIC ---
+        function renderData() {
+            const rawRows = getCurrentDayRows();
+            
+            const analysisSection = document.getElementById('analysisSection');
+            const resultSection = document.getElementById('resultSection');
+            const emptyState = document.getElementById('emptyState');
+
+            if (rawRows.length === 0) {
+                if(analysisSection) analysisSection.classList.add('hidden');
+                if(resultSection) resultSection.classList.add('hidden');
+                if(emptyState) {
+                    emptyState.classList.remove('hidden');
+                    document.getElementById('headerTotalManHours').innerText = "0 人 / 0.0hr";
+                }
+                return;
+            }
+
+            if(analysisSection) analysisSection.classList.remove('hidden');
+            if(resultSection) resultSection.classList.remove('hidden');
+            if(emptyState) emptyState.classList.add('hidden');
+
+            const userMap = {};
+            let totalHoursGlobal = 0;
+
+            rawRows.forEach(row => {
+                if (!userMap[row.name]) {
+                    userMap[row.name] = { 
+                        name: row.name, 
+                        group: row.group || '其他', 
+                        totalHours: 0, 
+                        tasks: [] 
+                    };
+                }
+                userMap[row.name].totalHours += row.hours;
+                userMap[row.name].tasks.push(row);
+                totalHoursGlobal += row.hours;
+            });
+
+            const userList = Object.values(userMap);
+            
+            let filteredUserList = userList;
+            if (activeFilterGroup !== 'ALL') {
+                filteredUserList = userList.filter(u => u.group === activeFilterGroup);
+            }
+
+            const statsText = `${userList.length}人 / ${totalHoursGlobal.toFixed(1)}hr`;
+            const headerTotalEl = document.getElementById('headerTotalManHours');
+            if(headerTotalEl) headerTotalEl.innerText = statsText;
+
+            let filteredHours = 0;
+            filteredUserList.forEach(u => filteredHours += u.totalHours);
+            const widgetTotalEl = document.getElementById('widgetTotalManHours');
+            if(widgetTotalEl) widgetTotalEl.innerText = `${filteredUserList.length}人 / ${filteredHours.toFixed(1)}hr`;
+
+            renderDetailList(filteredUserList);
+            renderDashboardWidgets(filteredUserList);
+            renderProjectStats(filteredUserList);
+        }
+
+        // --- ANALYSIS MODE SETTERS & LOGIC (Restored) ---
+        function setAnalysisMode(mode) {
+            analysisMode = mode;
+            activeTrendFilter = null; 
+            
+            const btnProject = document.getElementById('btnModeProject');
+            const btnPerson = document.getElementById('btnModePerson');
+            const btnGroup = document.getElementById('btnModeGroup');
+            const btnResetPerson = document.getElementById('btnResetPerson');
+            const btnResetProject = document.getElementById('btnResetProject');
+            
+            const activeClass = ['bg-white', 'text-corp-600', 'shadow-sm'];
+            const inactiveClass = ['text-slate-500', 'hover:text-slate-700'];
+            
+            [btnProject, btnPerson, btnGroup].forEach(btn => {
+                if(btn) {
+                    btn.classList.remove(...activeClass);
+                    btn.classList.add(...inactiveClass);
+                }
+            });
+
+            let activeBtn;
+            if(mode === 'PROJECT') activeBtn = btnProject;
+            else if(mode === 'PERSON') activeBtn = btnPerson;
+            else activeBtn = btnGroup;
+            
+            if(activeBtn) {
+                activeBtn.classList.remove(...inactiveClass);
+                activeBtn.classList.add(...activeClass);
+            }
+
+            const entityArea = document.getElementById('entitySelectionArea');
+            const chartHint = document.getElementById('chartLegendHint');
+            const title = document.getElementById('entitySelectionTitle');
+            
+            if(btnResetPerson) btnResetPerson.classList.add('hidden');
+            if(btnResetProject) btnResetProject.classList.add('hidden');
+
+            if (mode === 'PERSON') {
+                if(entityArea) entityArea.classList.remove('hidden');
+                if(chartHint) chartHint.classList.add('hidden'); 
+                if(title) title.innerHTML = '<i class="fa-solid fa-user-plus"></i> 點擊加入比對 (依組別分類)';
+                shouldSelectAllPersons = true; 
+            } else if (mode === 'PROJECT') {
+                if(entityArea) entityArea.classList.remove('hidden');
+                if(chartHint) chartHint.classList.add('hidden'); 
+                if(title) title.innerHTML = '<i class="fa-solid fa-plus-circle"></i> 點擊加入比對 (專案清單)';
+                shouldSelectAllProjects = true;
+            } else {
+                if(entityArea) entityArea.classList.add('hidden');
+                if(chartHint) chartHint.classList.remove('hidden');
+            }
+
+            if (mode === 'PERSON') selectedPersons.clear();
+            else if (mode === 'PROJECT') selectedProjects.clear();
+
+            renderTrendAnalysis();
+        }
+
+        function clearTrendFilter() {
+            activeTrendFilter = null;
+            renderTrendAnalysis();
+        }
+
+        function resetPersonSelection() {
+            shouldSelectAllPersons = true;
+            selectedPersons.clear();
+            renderTrendAnalysis();
+        }
+
+        function resetProjectSelection() {
+            shouldSelectAllProjects = true;
+            selectedProjects.clear();
+            renderTrendAnalysis();
+        }
+
+        function toggleProjectSelection(name) {
+            if (analysisMode === 'PROJECT') {
+                const isAllSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
+                if (isAllSelected) {
+                    selectedProjects.clear();
+                    selectedProjects.add(name);
+                } else {
+                    if (selectedProjects.size === 1 && selectedProjects.has(name)) {
+                        resetProjectSelection();
+                        return; 
+                    }
+                    if (selectedProjects.has(name)) selectedProjects.delete(name);
+                    else selectedProjects.add(name);
+                }
+                setTimeout(() => renderTrendAnalysis(), 0);
+            }
+        }
+
+        function togglePersonSelection(name) {
+            if (analysisMode === 'PERSON') {
+                const isAllSelected = (selectedPersons.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
+                if (isAllSelected) {
+                    selectedPersons.clear();
+                    selectedPersons.add(name);
+                } else {
+                    if (selectedPersons.size === 1 && selectedPersons.has(name)) {
+                        resetPersonSelection();
+                        return; 
+                    }
+                    if (selectedPersons.has(name)) selectedPersons.delete(name);
+                    else selectedPersons.add(name);
+                }
+                setTimeout(() => renderTrendAnalysis(), 0);
+            }
+        }
+
+        // --- TREND ANALYSIS ---
+        function renderTrendAnalysis() {
+            const hintBox = document.getElementById('trendFilterHint');
+            const hintText = document.getElementById('trendFilterText');
+            if (analysisMode === 'GROUP' && activeTrendFilter) {
+                hintBox.classList.remove('hidden');
+                hintText.innerText = `目前聚焦：${activeTrendFilter}`;
+            } else {
+                hintBox.classList.add('hidden');
+            }
+
+            const daysToAnalyze = parseInt(document.getElementById('analysisDays').value) || 7;
+            
+            const today = new Date();
+            const dates = [];
+            for(let i=daysToAnalyze-1; i>=0; i--) {
+                const d = new Date();
+                d.setDate(today.getDate() - i);
+                dates.push(d.toISOString().split('T')[0]);
+            }
+
+            const aggregated = {};
+            const allEntities = new Set(); 
+            const entityTotals = {}; 
+            const personGroups = {};
+            const rowStats = {}; 
+
+            dates.forEach(date => {
+                aggregated[date] = {};
+                if (!rowStats[date]) rowStats[date] = { totalHours: 0, uniqueAuthors: new Set() };
+
+                const rows = globalAllSheetData[date] || [];
+                
+                rows.forEach(row => {
+                    let key = '';
+                    let isRelevantForGroupStats = false;
+
+                    if (analysisMode === 'PROJECT') {
+                        key = row.project || '未分類';
+                        const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(key));
+                        if (mergeRule) key = mergeRule.alias;
+                    } else if (analysisMode === 'PERSON') {
+                        key = cleanAuthorName(row.name);
+                        personGroups[key] = cleanGroupName(row.group); 
+                    } else if (analysisMode === 'GROUP') {
+                        key = cleanGroupName(row.group);
+                        if (!activeTrendFilter || key === activeTrendFilter) {
+                            isRelevantForGroupStats = true;
+                        }
+                    }
+                    
+                    const val = row.hours;
+                    aggregated[date][key] = (aggregated[date][key] || 0) + val;
+                    allEntities.add(key);
+                    entityTotals[key] = (entityTotals[key] || 0) + val;
+
+                    if (analysisMode === 'GROUP' && isRelevantForGroupStats) {
+                        rowStats[date].totalHours += val;
+                        rowStats[date].uniqueAuthors.add(row.name);
+                    }
+                });
+            });
+
+            let entitiesArr = Array.from(allEntities);
+            currentTotalEntitiesCount = entitiesArr.length;
+            entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
+
+            if (analysisMode === 'PERSON' || analysisMode === 'PROJECT') {
+                const isProjectMode = (analysisMode === 'PROJECT');
+                const selectedSet = isProjectMode ? selectedProjects : selectedPersons;
+                const shouldSelectAll = isProjectMode ? shouldSelectAllProjects : shouldSelectAllPersons;
+                const btnReset = isProjectMode ? document.getElementById('btnResetProject') : document.getElementById('btnResetPerson');
+
+                if (shouldSelectAll && entitiesArr.length > 0) {
+                    entitiesArr.forEach(p => selectedSet.add(p));
+                    if (isProjectMode) shouldSelectAllProjects = false;
+                    else shouldSelectAllPersons = false;
+                }
+
+                if (selectedSet.size < currentTotalEntitiesCount && selectedSet.size > 0) {
+                    if(btnReset) btnReset.classList.remove('hidden');
+                } else {
+                    if(btnReset) btnReset.classList.add('hidden');
+                }
+
+                const unselectedContainer = document.getElementById('unselectedEntityContainer');
+                if(unselectedContainer) {
+                    unselectedContainer.innerHTML = '';
+                    const unselectedByGroup = {};
+                    entitiesArr.forEach(p => {
+                        if (!selectedSet.has(p)) {
+                            let grp = '其他';
+                            if (isProjectMode) grp = '專案清單';
+                            else grp = personGroups[p] || '其他';
+                            
+                            if (!unselectedByGroup[grp]) unselectedByGroup[grp] = [];
+                            unselectedByGroup[grp].push(p);
+                        }
+                    });
+                    
+                    const sortedGroups = Object.keys(unselectedByGroup).sort();
+                    if (sortedGroups.length === 0) {
+                        unselectedContainer.innerHTML = '<div class="text-xs text-slate-400 italic">所有項目已在圖表中</div>';
+                    } else {
+                        sortedGroups.forEach(grp => {
+                            const groupDiv = document.createElement('div');
+                            groupDiv.className = "mb-1";
+                            groupDiv.innerHTML = `<h5 class="text-[10px] font-bold text-slate-400 mb-1 ml-1">${grp}</h5>`;
+                            const btnContainer = document.createElement('div');
+                            btnContainer.className = "flex flex-wrap gap-2";
+                            unselectedByGroup[grp].forEach(p => {
+                                const btn = document.createElement('button');
+                                btn.className = "text-[10px] font-medium px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-corp-600 transition flex items-center gap-1 shadow-sm";
+                                btn.innerHTML = `<i class="fa-solid fa-plus text-slate-300"></i> ${p}`;
+                                btn.onclick = () => isProjectMode ? toggleProjectSelection(p) : togglePersonSelection(p);
+                                btnContainer.appendChild(btn);
+                            });
+                            groupDiv.appendChild(btnContainer);
+                            unselectedContainer.appendChild(groupDiv);
+                        });
+                    }
+                }
+                entitiesArr = Array.from(selectedSet).sort((a,b) => entityTotals[b] - entityTotals[a]);
+            } else {
+                if (activeTrendFilter) entitiesArr = entitiesArr.filter(e => e === activeTrendFilter);
+            }
+
+            let isStacked = (analysisMode === 'GROUP') || (analysisMode === 'PROJECT' && selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
+            
+            const datasets = entitiesArr.map((entity, i) => ({
+                label: entity,
+                data: dates.map(date => aggregated[date][entity] || 0),
+                backgroundColor: getColor(i),
+                stack: isStacked ? 'Stack 0' : undefined, 
+            }));
+
+            const ctxEl = document.getElementById('trendChart');
+            if (ctxEl) {
+                if (trendChartInstance) trendChartInstance.destroy();
+                trendChartInstance = new Chart(ctxEl.getContext('2d'), {
+                    type: 'bar',
+                    data: { labels: dates, datasets: datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        onClick: (evt, activeElements, chart) => {
+                            if (activeElements.length > 0) {
+                                const label = chart.data.datasets[activeElements[0].datasetIndex].label;
+                                if (analysisMode === 'PERSON') togglePersonSelection(label);
+                                else if (analysisMode === 'PROJECT') toggleProjectSelection(label);
+                                else {
+                                    activeTrendFilter = (activeTrendFilter === label) ? null : label;
+                                    setTimeout(() => renderTrendAnalysis(), 0);
+                                }
+                            }
+                        },
+                        scales: { x: { stacked: isStacked }, y: { stacked: isStacked, beginAtZero: true, title: { display: true, text: '總工時 (hr)' } } },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } }, onClick: (e, l) => {
+                            if(analysisMode === 'PERSON') togglePersonSelection(l.text);
+                            else if(analysisMode === 'PROJECT') toggleProjectSelection(l.text);
+                            else { activeTrendFilter = (activeTrendFilter === l.text) ? null : l.text; setTimeout(() => renderTrendAnalysis(), 0); }
+                        }}}
+                    }
+                });
+            }
+            renderTrendTable(dates, entitiesArr, aggregated, rowStats);
+        }
+
+        // --- UTILS & HELPERS ---
+        function cleanGroupName(group) {
+            if (!group) return '其他';
+            group = group.trim();
+            if (globalSettings.groupMerges) {
+                for (const rule of globalSettings.groupMerges) {
+                    if (rule.originals.includes(group)) return rule.alias;
+                }
+            }
+            return group;
+        }
+        function cleanAuthorName(name) { return name ? name.slice(-5) : 'Unknown'; }
+        
+        function handleScroll() {
+            const scrollContainer = document.getElementById('scrollContainer');
+            const button = document.getElementById('backToResultBtn');
+            if (!scrollContainer || !button) return;
+            if (scrollContainer.scrollTop > 400) {
+                button.classList.remove('opacity-0', 'translate-y-5');
+                button.classList.add('opacity-100', 'translate-y-0');
+            } else {
+                button.classList.remove('opacity-100', 'translate-y-0');
+                button.classList.add('opacity-0', 'translate-y-5');
+            }
+        }
+        function scrollToResult() { document.getElementById('resultAnchor')?.scrollIntoView({ behavior: 'smooth' }); }
+        function scrollToAnalysis() { document.getElementById('analysisAnchor')?.scrollIntoView({ behavior: 'smooth' }); }
+        function getUserId(name) { return 'user_card_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_'); }
+        function scrollToUser(name) {
+            const id = getUserId(name);
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('highlight-card');
+                setTimeout(() => el.classList.remove('highlight-card'), 2000);
+            }
+        }
+        function toggleSidebar() {
+            const sidebar = document.getElementById('mainSidebar');
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('absolute', 'w-full', 'h-full', 'left-0', 'top-0');
+            } else {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('absolute', 'w-full', 'h-full', 'left-0', 'top-0');
+            }
+        }
+        function toggleTask(btn) {
+            const content = btn.parentElement.querySelector('.accordion-content');
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            btn.setAttribute('aria-expanded', !isExpanded);
+            if (!isExpanded) content.classList.add('expanded', 'p-3', 'pt-0');
+            else content.classList.remove('expanded', 'p-3', 'pt-0');
+        }
+        function formatContent(text) { return !text ? '(無內容)' : text.replace(/(測試內容|工作事項|問題回報)/g, '<span class="font-bold text-slate-800">$1</span>'); }
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+        
+        // --- DATA EXPORT/IMPORT ---
+        function exportData() {
+            const db = localStorage.getItem(DB_KEY);
+            if (!db) return showToast('無資料可備份');
+            const blob = new Blob([db], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `daily_report_backup_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    localStorage.setItem(DB_KEY, e.target.result);
+                    window.location.reload(); 
+                } catch (error) { showToast('檔案格式錯誤'); }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- Placeholders for remaining renders to avoid breakage ---
+        function renderDashboardWidgets(list) { 
+            const container = document.getElementById('hoursGridContainer'); if(container) container.innerHTML = ''; else return;
+            const sorted = [...list].sort((a,b) => b.totalHours - a.totalHours);
+            container.innerHTML = sorted.map(u => {
+                let barColor = u.totalHours < 8 ? 'bg-amber-400' : (u.totalHours > 10 ? 'bg-rose-500' : 'bg-emerald-500');
+                let width = Math.min((u.totalHours / 12) * 100, 100);
+                const safeName = u.name.replace(/'/g, "\\'");
+                return `<div onclick="scrollToUser('${safeName}')" class="cursor-pointer flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition"><div class="font-bold text-sm text-slate-700 truncate w-32 shrink-0">${cleanAuthorName(u.name)}</div><div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden"><div class="${barColor} h-2 rounded-full" style="width: ${width}%"></div></div><div class="font-mono text-sm font-bold text-slate-700 w-12 text-right">${u.totalHours.toFixed(1)}</div></div>`
+            }).join('');
+        }
+        function renderDetailList(list) {
+            const container = document.getElementById('detailView'); if(container) container.innerHTML = ''; else return;
+            list.forEach(u => {
+                const card = document.createElement('div');
+                card.id = getUserId(u.name);
+                card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
+                let tasksHtml = u.tasks.map(t => `<div class="border-b border-slate-100 last:border-0"><button class="accordion-btn w-full text-left p-2 flex justify-between hover:bg-slate-50" onclick="toggleTask(this)" aria-expanded="false"><div class="flex gap-2"><span class="text-xs bg-slate-100 px-1 rounded">${t.project}</span><span class="font-bold text-sm">${t.issue}</span></div><span class="font-mono text-xs font-bold text-corp-600">${t.hours}hr</span></button><div class="accordion-content bg-slate-50/50"><div class="p-2 text-xs text-slate-600 border-t border-dashed">${formatContent(t.content)}</div>${t.link?'<div class="px-2 pb-1 text-right"><a href="'+t.link+'" target="_blank" class="text-[10px] text-indigo-600 underline">連結</a></div>':''}</div></div>`).join('');
+                card.innerHTML = `<div class="p-2 md:w-32 bg-slate-50 flex flex-col items-center justify-center shrink-0 border-r border-slate-100"><div class="text-[10px] text-slate-400">${u.group}</div><div class="font-bold text-sm">${cleanAuthorName(u.name)}</div><div class="text-xs font-bold bg-slate-200 px-2 rounded-full mt-1">${u.totalHours.toFixed(1)}h</div></div><div class="flex-1">${tasksHtml}</div>`;
+                container.appendChild(card);
+            });
+        }
+        // ... (Pie chart logic remains same as before) ...
+        function renderProjectStats(userList) {
+             const canvas = document.getElementById('projectPieChart');
+             if (!canvas || canvas.offsetParent === null) return;
+             let allTasks = [];
+             userList.forEach(u => allTasks.push(...u.tasks));
+             if (allTasks.length === 0) {
+                 document.getElementById('projectTableBody').innerHTML = '';
+                 if (projectChartInstance) { projectChartInstance.destroy(); projectChartInstance = null; }
+                 return;
+             }
+             const counts = {}; let total = 0;
+             allTasks.forEach(t => {
+                let p = t.project || '未分類';
+                const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(p));
+                if (mergeRule) p = mergeRule.alias;
+                counts[p] = (counts[p] || 0) + t.hours;
+                total += t.hours;
+             });
+             const dataArr = Object.keys(counts).map(k => ({ name: k, hours: counts[k], percent: (counts[k] / total * 100).toFixed(1) })).sort((a, b) => b.hours - a.hours);
+             
+             document.getElementById('projectTableBody').innerHTML = dataArr.map((d, i) => `<tr class="hover:bg-slate-50 border-b border-slate-100 last:border-0 group"><td class="px-3 py-2 text-center ${isMergeMode ? '' : 'hidden'}"><input type="checkbox" class="proj-checkbox rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer" value="${d.name.replace(/"/g, '&quot;')}"></td><td class="px-3 py-2 font-bold text-slate-700 flex items-center"><span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background-color: ${getColor(i)}"></span><span class="truncate max-w-[120px]" title="${d.name}">${d.name}</span></td><td class="px-3 py-2 text-right font-mono">${d.hours.toFixed(1)}</td><td class="px-3 py-2 text-right font-mono text-slate-400">${d.percent}%</td></tr>`).join('');
+
+             const ctx = canvas.getContext('2d');
+             if (projectChartInstance) projectChartInstance.destroy();
+             projectChartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: dataArr.map(d => d.name), datasets: [{ data: dataArr.map(d => d.hours), backgroundColor: dataArr.map((_, i) => getColor(i)), borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '65%', layout: { padding: 10 } } });
+        }
+        function updateRawPreview() {
+            const ta = document.getElementById('rawJsonPreview');
+            // Add safety check
+            if(ta && globalAllSheetData) {
+                ta.value = JSON.stringify(globalAllSheetData, null, 2);
+            }
+        }
+        function filterByGroup(g) { activeFilterGroup = (activeFilterGroup === g && g !== 'ALL') ? 'ALL' : g; document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-group') === activeFilterGroup)); renderData(); }
+        
+        function handleMergeButtonClick() { if (!isMergeMode) { isMergeMode = true; document.getElementById('btnMergeAction').querySelector('span').innerText = "合併選取項目"; document.getElementById('btnCancelMerge').classList.remove('hidden'); document.getElementById('thCheckbox').classList.remove('hidden'); document.getElementById('mergeHint').classList.remove('hidden'); renderData(); } else { openMergeDialog(); } }
+        function cancelMergeMode() { isMergeMode = false; document.getElementById('btnMergeAction').querySelector('span').innerText = "合併設定"; document.getElementById('btnCancelMerge').classList.add('hidden'); document.getElementById('thCheckbox').classList.add('hidden'); document.getElementById('mergeHint').classList.add('hidden'); renderData(); }
+        function toggleAllProjectCheckboxes(source) { document.querySelectorAll('.proj-checkbox').forEach(cb => cb.checked = source.checked); }
+        function openMergeDialog() { if(document.querySelectorAll('.proj-checkbox:checked').length < 2) return showToast('請至少勾選兩個專案'); document.getElementById('mergeNameInput').value = document.querySelector('.proj-checkbox:checked').value; document.getElementById('mergeListPreview').innerHTML = Array.from(document.querySelectorAll('.proj-checkbox:checked')).map(cb => `<li>${cb.value}</li>`).join(''); document.getElementById('mergeDialogOverlay').classList.remove('hidden'); }
+        function closeMergeDialog() { document.getElementById('mergeDialogOverlay').classList.add('hidden'); }
+        function confirmMerge() { 
+            const newName = document.getElementById('mergeNameInput').value;
+            const checkboxes = document.querySelectorAll('.proj-checkbox:checked');
+            const selectedNames = Array.from(checkboxes).map(cb => cb.value);
+            let actualOriginals = [];
+            selectedNames.forEach(name => {
+                const existingRuleIndex = globalSettings.projectMerges.findIndex(r => r.alias === name);
+                if (existingRuleIndex > -1) { actualOriginals.push(...globalSettings.projectMerges[existingRuleIndex].originals); globalSettings.projectMerges.splice(existingRuleIndex, 1); } 
+                else { actualOriginals.push(name); }
+            });
+            globalSettings.projectMerges.push({ alias: newName.trim(), originals: actualOriginals });
+            saveGlobalSettings(); closeMergeDialog(); cancelMergeMode(); showToast('合併成功');
+        }
+        function renderTrendTable(dates, entities, dataMap, rowStats) {
+             const table = document.getElementById('trendTable'); if(!table) return;
+             const showAvg = (analysisMode === 'GROUP');
+             let html = `<thead class="bg-slate-50 border-b border-slate-200"><tr><th class="px-2 py-2 font-bold text-slate-500">日期</th>${entities.map(e => `<th class="px-2 py-2 text-center text-slate-700 whitespace-nowrap">${e}</th>`).join('')}<th class="px-2 py-2 text-right font-bold text-slate-700">總計</th>${showAvg?'<th class="px-2 py-2 text-right font-bold text-indigo-600 bg-indigo-50/30">平均</th>':''}</tr></thead><tbody>`;
+             [...dates].reverse().forEach(date => {
+                 let rowTotal = 0;
+                 const cells = entities.map(e => { const val = dataMap[date][e] || 0; rowTotal += val; return `<td class="px-2 py-2 text-center border-b border-slate-50 ${val===0?'text-slate-200':'text-slate-600 font-mono'}">${val>0?val.toFixed(1):'-'}</td>`; });
+                 let avgCell = '';
+                 if (showAvg) { const s = rowStats[date]; const avg = s.uniqueAuthors.size > 0 ? (s.totalHours/s.uniqueAuthors.size).toFixed(1) : '-'; avgCell = `<td class="px-2 py-2 text-right font-bold font-mono text-indigo-600 border-b border-slate-50 bg-indigo-50/30">${avg}</td>`; }
+                 html += `<tr class="hover:bg-slate-50 transition"><td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${date}</td>${cells.join('')}<td class="px-2 py-2 text-right font-bold text-slate-800 border-b border-slate-50 bg-slate-50/50">${rowTotal.toFixed(1)}</td>${avgCell}</tr>`;
+             });
+             table.innerHTML = html + '</tbody>';
+        }
+        
+        // Settings renderers (kept simple)
+        function renderSettingsTab() { 
+            document.getElementById('mergeRulesContainer').innerHTML = globalSettings.projectMerges.map((r,i)=>`<div class="flex justify-between bg-slate-50 p-2 rounded mb-1"><div class="text-xs"><span class="font-bold">${r.alias}</span> <span class="text-slate-400">${r.originals.join(',')}</span></div><div class="flex items-center"><button onclick="openEditProjectRule(${i})" class="text-slate-400 hover:text-indigo-600 p-2 transition"><i class="fa-solid fa-pen-to-square"></i></button><button onclick="deleteProjectRule(${i})" class="text-slate-400 hover:text-rose-500 p-2 transition"><i class="fa-solid fa-trash"></i></button></div></div>`).join('');
+            document.getElementById('groupRulesContainer').innerHTML = globalSettings.groupMerges.map((r,i)=>`<div class="flex justify-between bg-slate-50 p-2 rounded mb-1"><div class="text-xs"><span class="font-bold">${r.alias}</span> <span class="text-slate-400">${r.originals.join(',')}</span></div><button onclick="deleteGroupRule(${i})" class="text-slate-400"><i class="fa-solid fa-trash"></i></button></div>`).join('');
+        }
+        function addGroupRule() { 
+            const a = document.getElementById('newGroupAlias').value; const s = document.getElementById('newGroupSources').value;
+            if(!a||!s) return; globalSettings.groupMerges.unshift({alias:a, originals:s.split(/[,\s]+/).filter(Boolean)}); saveGlobalSettings(); showToast('規則已新增');
+        }
+        function deleteGroupRule(i) { globalSettings.groupMerges.splice(i,1); saveGlobalSettings(); renderSettingsTab(); }
+        function deleteProjectRule(i) { globalSettings.projectMerges.splice(i,1); saveGlobalSettings(); renderSettingsTab(); }
+        
+        // Missing Function from Prompt
+        function openEditProjectRule(index) {
+            ruleToEditIndex = index;
+            const rule = globalSettings.projectMerges[index];
+            if (!rule) return;
+            const input = document.getElementById('editAliasInput');
+            input.value = rule.alias;
+            document.getElementById('editDialogOverlay').classList.remove('hidden');
+            input.focus();
+        }
+        function closeEditDialog() { document.getElementById('editDialogOverlay').classList.add('hidden'); ruleToEditIndex = -1; }
+        function saveEditedProjectRule() {
+            if (ruleToEditIndex === -1) return;
+            const input = document.getElementById('editAliasInput');
+            const newAlias = input.value.trim();
+            if (!newAlias) return alert('請輸入名稱');
+            globalSettings.projectMerges[ruleToEditIndex].alias = newAlias;
+            saveGlobalSettings(); closeEditDialog(); renderData(); showToast('名稱已更新');
+        }
+
+    </script>
+</body>
+</html>
