@@ -113,3 +113,21 @@
 本系統僅供讀取 (Read-only)，不會修改您的 Google Sheet 內容。
 
 資料儲存於個別瀏覽器的 LocalStorage 中，清除瀏覽器快取會遺失歷史紀錄 (建議定期使用匯出功能備份)。
+
+
+
+##  time auto refresh ver
+資料來源設定介面：新增了「自動刷新間隔 (分鐘)」的設定欄位。
+
+核心邏輯：
+
+在 globalSettings 中新增 autoRefreshInterval 參數。
+
+新增 setupAutoRefresh() 函式來管理計時器。
+
+修改 fetchAllData()，在點擊「儲存設定並同步資料」時，會一併儲存刷新時間設定並重啟計時器。
+
+在 switchTab('SOURCE') 時，會自動讀取目前的設定值填入輸入框。
+
+現在，只要在該欄位輸入大於 0 的數字並點擊同步按鈕，系統就會依據設定的時間間隔自動抓取最新資料。
+ 
