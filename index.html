@@ -634,7 +634,7 @@
             { alias: '技術', originals: ['技術', '技術組'] },
             { alias: '網頁', originals: ['網頁組', '網頁'] },
             { alias: '資料庫', originals: ['資料庫', '資料庫組'] },
-            { alias: '客服', originals: ['客服','客服組', '【客服組】'] }
+            { alias: '客服組', originals: ['客服組', '【客服組】'] }
         ];
 
         // Global Settings Model:
@@ -1567,7 +1567,7 @@
                 `}).join('');
 
                 card.innerHTML = `
-                    <div class="p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
+                    <div onclick="toggleAllTasks(this)" class="cursor-pointer hover:bg-slate-100 transition p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0" title="點擊展開/收合所有項目">
                         <div class="flex flex-col items-center">
                             <div class="text-[10px] text-slate-400 font-bold mb-0.5">${u.group}</div>
                             <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap truncate w-full px-1" title="${u.name}">
@@ -1579,6 +1579,34 @@
                     <div class="flex-1 bg-white flex flex-col">${tasksHtml}</div>
                 `;
                 container.appendChild(card);
+            });
+        }
+
+        function toggleAllTasks(headerEl) {
+            const card = headerEl.parentElement;
+            const buttons = card.querySelectorAll('.accordion-btn');
+            const contents = card.querySelectorAll('.accordion-content');
+            
+            // 檢查是否全部都已經展開 (若全部展開，則動作為收合；若有任一未展開，則動作為全展開)
+            const allExpanded = Array.from(buttons).every(btn => btn.getAttribute('aria-expanded') === 'true');
+            const newState = !allExpanded;
+
+            buttons.forEach(btn => {
+                btn.setAttribute('aria-expanded', newState);
+                // 同步旋轉箭頭 icon
+                const icon = btn.querySelector('.accordion-icon');
+                if (icon) {
+                    if (newState) icon.style.transform = 'rotate(180deg)';
+                    else icon.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            contents.forEach(content => {
+                if (newState) {
+                    content.classList.add('expanded', 'p-3', 'pt-0');
+                } else {
+                    content.classList.remove('expanded', 'p-3', 'pt-0');
+                }
             });
         }
 
