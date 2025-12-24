@@ -213,6 +213,42 @@
                             請確保試算表權限已設為「知道連結者皆可檢視」，系統將透過公開模式讀取。
                         </p>
 
+                        <!-- FEATURE 1: Auto Refresh Setting Block (Updated) -->
+                        <div class="bg-blue-50/50 rounded-lg p-4 border border-blue-100 flex flex-col md:flex-row items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <!-- Removed Alarm Clock Icon -->
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="chkAutoRefreshToggle" class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" onchange="toggleAutoRefreshPanel()">
+                                    <span class="text-sm font-bold text-slate-700">自動刷新設定</span>
+                                </label>
+                            </div>
+                            
+                            <div id="autoRefreshConfigPanel" class="hidden flex-1 flex flex-wrap items-center gap-2">
+                                <span class="text-xs text-slate-500 ml-2">範圍:</span>
+                                <select id="selAutoRefreshRange" class="border border-slate-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none cursor-pointer bg-white">
+                                    <option value="3">近 3 天</option>
+                                    <option value="7">近 7 天</option>
+                                    <option value="30">近 1 個月</option>
+                                    <option value="ALL">全部</option>
+                                </select>
+
+                                <span class="text-xs text-slate-500 ml-2">每隔</span>
+                                <input type="number" id="inpAutoRefreshMinutes" value="5" min="1" class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-blue-500 focus:outline-none">
+                                <span class="text-xs text-slate-500">分鐘</span>
+                                
+                                <button onclick="confirmAutoRefresh()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition ml-auto md:ml-0">
+                                    確定並啟用
+                                </button>
+                            </div>
+
+                            <div class="ml-auto">
+                                <span id="badgeAutoRefreshStatus" class="text-[10px] font-bold px-2 py-1 rounded border bg-slate-100 text-slate-400 border-slate-200">
+                                    <i class="fa-solid fa-circle-pause mr-1"></i> 未啟用
+                                </span>
+                            </div>
+                        </div>
+                        <!-- End Feature 1 -->
+
                         <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
                             <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">欄位對應 (Column Index: A=0, B=1, C=2...)</h3>
                             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
@@ -385,8 +421,8 @@
                     <div class="space-y-4">
                         <div class="flex justify-between items-end pb-2 border-b border-slate-100">
                              <div>
-                                <h3 class="font-bold text-slate-600 text-sm">專案合併規則</h3>
-                                <p class="text-xs text-slate-400">這些規則會自動將多個專案名稱合併為一個，影響工時統計圖表。</p>
+                                 <h3 class="font-bold text-slate-600 text-sm">專案合併規則</h3>
+                                 <p class="text-xs text-slate-400">這些規則會自動將多個專案名稱合併為一個，影響工時統計圖表。</p>
                              </div>
                         </div>
 
@@ -581,9 +617,15 @@
     <!-- Toast -->
     <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
 
-    <!-- Floating Back to Result Button (Point 1) -->
-    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-5 right-5 md:bottom-10 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-10 h-10 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5">
-        <i class="fa-solid fa-arrow-up text-sm"></i>
+    <!-- Floating Buttons Container (FEATURE 2) -->
+    <!-- Up Arrow (Back to Top / Result) - Now at bottom-24 -->
+    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-24 right-5 md:bottom-24 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5">
+        <i class="fa-solid fa-arrow-up text-xl"></i>
+    </button>
+
+    <!-- Down Arrow (Go to Analysis) - Now at bottom-5 (Swapped Position, Matching Style, Larger Icon) -->
+    <button onclick="scrollToAnalysis()" id="goToAnalysisBtn" class="fixed bottom-5 right-5 md:bottom-5 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 transform translate-y-0">
+        <i class="fa-solid fa-arrow-down text-xl"></i>
     </button>
 
     <script>
@@ -597,6 +639,7 @@
         let ruleToDeleteIndex = -1; // Track index for deletion
         let ruleToEditIndex = -1; // Track index for editing
         let deleteType = ''; // 'project' or 'group'
+        let autoRefreshTimer = null; // FEATURE 1: Timer ID
         
         // Analysis State
         let analysisMode = 'PROJECT'; // 'PROJECT', 'PERSON', or 'GROUP'
@@ -660,6 +703,8 @@
             const scrollContainer = document.getElementById('scrollContainer');
             if (scrollContainer) {
                 scrollContainer.addEventListener('scroll', handleScroll);
+                // Call once to set initial button state
+                handleScroll();
             }
             
             if (currentDailyData.rows.length === 0) {
@@ -689,19 +734,99 @@
             renderSettingsTab(); // Update UI
         }
 
+        // --- FEATURE 1: AUTO REFRESH LOGIC ---
+        function toggleAutoRefreshPanel() {
+            const chk = document.getElementById('chkAutoRefreshToggle');
+            const panel = document.getElementById('autoRefreshConfigPanel');
+            if (chk.checked) {
+                panel.classList.remove('hidden');
+                panel.classList.add('flex');
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('flex');
+                stopAutoRefresh(); // Uncheck implies stop
+            }
+        }
+
+        function confirmAutoRefresh() {
+            const mins = parseInt(document.getElementById('inpAutoRefreshMinutes').value);
+            const range = document.getElementById('selAutoRefreshRange').value;
+            
+            if (!mins || mins < 1) {
+                showToast('請輸入有效的分鐘數 (至少 1 分鐘)');
+                return;
+            }
+            
+            startAutoRefresh(mins, range);
+        }
+
+        function startAutoRefresh(minutes, range) {
+            stopAutoRefresh(); // Clear existing
+            
+            // Update UI status
+            const badge = document.getElementById('badgeAutoRefreshStatus');
+            badge.className = "text-[10px] font-bold px-2 py-1 rounded border bg-green-100 text-green-600 border-green-200 animate-pulse";
+            badge.innerHTML = `<i class="fa-solid fa-circle-play mr-1"></i> 每 ${minutes} 分鐘刷新`;
+            
+            let rangeLabel = '全部';
+            if (range === '3') rangeLabel = '近3天';
+            if (range === '7') rangeLabel = '近7天';
+            if (range === '30') rangeLabel = '近1月';
+            
+            showToast(`已啟用自動刷新 (每 ${minutes} 分鐘, 範圍: ${rangeLabel})`);
+            
+            // Set Interval
+            autoRefreshTimer = setInterval(() => {
+                // Only fetch if we have an ID
+                const id = document.getElementById('gsheetId').value;
+                if(id) {
+                    fetchGoogleSheetData(range); // Pass range to fetch function
+                }
+            }, minutes * 60 * 1000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+            const badge = document.getElementById('badgeAutoRefreshStatus');
+            badge.className = "text-[10px] font-bold px-2 py-1 rounded border bg-slate-100 text-slate-400 border-slate-200";
+            badge.innerHTML = `<i class="fa-solid fa-circle-pause mr-1"></i> 未啟用`;
+        }
+
         // --- SCROLL LISTENERS & ACTIONS ---
         function handleScroll() {
             const scrollContainer = document.getElementById('scrollContainer');
-            const button = document.getElementById('backToResultBtn');
-            if (!scrollContainer || !button) return;
+            const upBtn = document.getElementById('backToResultBtn'); // Now Up arrow
+            const downBtn = document.getElementById('goToAnalysisBtn'); // Now Down arrow
+            
+            if (!scrollContainer) return;
 
-            // Show button if scrolled down significantly (e.g., more than 400px)
-            if (scrollContainer.scrollTop > 400) {
-                button.classList.remove('opacity-0', 'translate-y-5');
-                button.classList.add('opacity-100', 'translate-y-0');
+            const scrollTop = scrollContainer.scrollTop;
+            const scrollHeight = scrollContainer.scrollHeight;
+            const clientHeight = scrollContainer.clientHeight;
+
+            // Logic for UP Arrow
+            if (scrollTop > 400) {
+                upBtn.classList.remove('opacity-0', 'translate-y-5');
+                upBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
-                button.classList.remove('opacity-100', 'translate-y-0');
-                button.classList.add('opacity-0', 'translate-y-5');
+                upBtn.classList.remove('opacity-100', 'translate-y-0');
+                upBtn.classList.add('opacity-0', 'translate-y-5');
+            }
+
+            // Logic for DOWN Arrow
+            // Hide if we are close to the bottom (Analysis section)
+            const isNearBottom = (scrollHeight - scrollTop - clientHeight) < 200;
+            
+            // Only show down arrow if there is scrollable content and we aren't near bottom
+            if (scrollHeight > clientHeight + 100 && !isNearBottom) {
+                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden');
+                downBtn.classList.add('opacity-100', 'translate-y-0');
+            } else {
+                downBtn.classList.remove('opacity-100', 'translate-y-0');
+                downBtn.classList.add('opacity-0', 'translate-y-5');
             }
         }
         
@@ -784,6 +909,8 @@
             if (tab === 'OVERVIEW') {
                 overviewSec.classList.remove('hidden');
                 renderData(); // Refresh overview
+                // Recalculate scroll arrows state
+                setTimeout(handleScroll, 100);
             } else if (tab === 'ANALYSIS') {
                 analysisSec.classList.remove('hidden');
                 renderTrendAnalysis();
@@ -861,9 +988,13 @@
         }
 
         // --- GOOGLE SHEET FETCH LOGIC (Main Driver) ---
-        async function fetchGoogleSheetData() {
+        // Modified to support autoRefreshRange (string)
+        async function fetchGoogleSheetData(autoRefreshRange = null) {
             const sheetId = document.getElementById('gsheetId').value.trim();
-            const date = document.getElementById('reportDatePicker').value;
+            // In manual mode (autoRefreshRange is null), we use the picker. 
+            // In auto mode, we might process multiple dates.
+            const pickerDate = document.getElementById('reportDatePicker').value;
+            
             const btn = document.getElementById('btnFetchGSheet');
             const statusMsg = document.getElementById('gsheetStatusMsg');
             
@@ -871,13 +1002,12 @@
             statusMsg.innerHTML = '';
 
             if (!sheetId) {
-                // If ID is missing, switch to Source tab immediately for correction
                 switchTab('SOURCE');
                 return showToast('請先設定 Google Sheet ID');
             }
-            if (!date) return showToast('請選擇日期');
+            if (!autoRefreshRange && !pickerDate) return showToast('請選擇日期');
 
-            // --- Capture Config from DOM inputs (as they hold the definitive current settings) ---
+            // --- Capture Config ---
             const cols = {
                 date: parseInt(document.getElementById('colDate').value) || 0,
                 group: parseInt(document.getElementById('colGroup').value) || 1,
@@ -888,22 +1018,23 @@
                 hours:  parseInt(document.getElementById('colHours').value) || 6,
                 link:  parseInt(document.getElementById('colLink').value) || 7
             };
-            currentDailyData.config = { sheetId, cols };
+            // Note: we don't update currentDailyData.config here immediately for DB save, 
+            // but we use these cols for parsing.
 
-            // --- UI Busy State ---
-            const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
-            headerBtn.disabled = true;
-            btn.disabled = true;
-            headerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span class="hidden md:inline">更新中</span>';
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 讀取中...';
-
+            // --- UI Busy State (Only for Manual) ---
+            if (!autoRefreshRange) {
+                const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
+                headerBtn.disabled = true;
+                btn.disabled = true;
+                headerBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span class="hidden md:inline">更新中</span>';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 讀取中...';
+            }
 
             const updateStatus = (msg, type) => {
                 statusMsg.className = type === 'error' ? 'text-rose-600 text-sm font-bold' : 'text-emerald-600 text-sm font-bold';
                 statusMsg.innerHTML = msg;
             };
 
-            // --- MODE: PUBLIC (Legacy GVIZ) ---
             const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
             const strategies = [
                 { url: gvizUrl, name: 'Direct' },
@@ -924,7 +1055,6 @@
                         text = data.contents;
                     }
 
-                    // Remove wrapping: "/*O_o*/ google.visualization.Query.setResponse({ ... });"
                     const start = text.indexOf('{');
                     const end = text.lastIndexOf('}') + 1;
                     if (start > -1 && end > -1) {
@@ -936,71 +1066,141 @@
                 }
             }
             
-            // --- UI Reset ---
-            headerBtn.disabled = false;
-            btn.disabled = false;
-            headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
-            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取資料';
+            // Reset UI (Manual)
+            if (!autoRefreshRange) {
+                const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
+                headerBtn.disabled = false;
+                btn.disabled = false;
+                headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取資料';
+            }
 
             if (!successJson || !successJson.table) {
                 updateStatus('讀取失敗：無法存取試算表。請確認 ID 正確且權限已設為「知道連結者皆可檢視」。', 'error');
-                currentDailyData.rows = [];
-            } else {
-                // Process Data from GVIZ structure
-                const rows = successJson.table.rows;
-                const fetchedData = [];
-                let count = 0;
+                return;
+            }
 
+            const rows = successJson.table.rows;
+            
+            // --- Helper: Parse Row ---
+            const parseRow = (row) => {
+                const c = row.c;
+                if (!c) return null;
+                const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
+                
+                const name = String(getVal(cols.name)).trim();
+                if (!name) return null;
+
+                const rawGroupName = String(getVal(cols.group)).trim();
+                const groupName = cleanGroupName(rawGroupName);
+                let proj = String(getVal(cols.proj)).trim().replace(/【.*?】/g, '').trim();
+                let idVal = String(getVal(cols.id)).trim();
+                let content = String(getVal(cols.content)).trim();
+                let link = String(getVal(cols.link)).trim();
+                const hrsVal = getVal(cols.hours);
+                const hours = parseFloat(hrsVal) || 0;
+                
+                return {
+                    name, group: groupName, project: proj, issue: idVal, content, hours, link
+                };
+            };
+
+            // --- MODE SELECTION ---
+            if (autoRefreshRange) {
+                // === AUTO BATCH MODE ===
+                const db = getDB();
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                
+                let cutoffTime = 0;
+                // Calculate cutoff
+                if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000); 
+                else if (autoRefreshRange === '7') cutoffTime = today.getTime() - (6 * 86400000);
+                else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
+                else if (autoRefreshRange === 'ALL') cutoffTime = 0;
+
+                const batchData = {}; // { "YYYY-MM-DD": [rows...] }
+
+                rows.forEach(row => {
+                    const c = row.c; 
+                    if(!c) return;
+                    const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
+                    const rowDateStr = getVal(cols.date);
+                    if (!rowDateStr) return;
+
+                    // Normalize Date Key
+                    let keyDate = String(rowDateStr).trim();
+                    // Try parsing to ensure format YYYY-MM-DD standard, fallback to string if fails
+                    // This handles diverse formats like "2023/1/1" -> "2023-01-01"
+                    const dObj = new Date(String(rowDateStr).replace(/\//g, '-'));
+                    
+                    if (isNaN(dObj.getTime())) {
+                        // If not parseable, we can skip or use raw string if strict.
+                        // We will skip if we can't determine time for cutoff logic.
+                        return;
+                    }
+                    
+                    // Check Cutoff
+                    if (autoRefreshRange !== 'ALL' && dObj.getTime() < cutoffTime) return;
+
+                    // Format key
+                    keyDate = dObj.toISOString().split('T')[0];
+
+                    const parsed = parseRow(row);
+                    if(parsed) {
+                        if (!batchData[keyDate]) batchData[keyDate] = [];
+                        batchData[keyDate].push(parsed);
+                    }
+                });
+
+                // Update DB for affected dates
+                let updateCount = 0;
+                Object.keys(batchData).forEach(k => {
+                    db[k] = {
+                        config: { sheetId, cols },
+                        rows: batchData[k]
+                    };
+                    updateCount++;
+                });
+                
+                saveDB(db);
+                
+                // Refresh UI if current date was affected, or just stay put
+                if (currentReportDate && db[currentReportDate]) {
+                    loadReportByDate(currentReportDate);
+                } else {
+                    // Update list only
+                    updateHistoryList();
+                }
+                
+                updateStatus(`自動刷新完成 (範圍: ${autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天'}, 更新 ${updateCount} 天)`, 'success');
+
+            } else {
+                // === MANUAL SINGLE DATE MODE ===
+                const fetchedData = [];
                 rows.forEach(row => {
                     const c = row.c;
                     if (!c) return;
                     const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
-
-                    // Use the configured column indices
                     let rowDate = getVal(cols.date);
-                    if (!rowDate || !String(rowDate).includes(date)) return;
-
-                    const name = String(getVal(cols.name)).trim();
-                    if (!name) return;
-
-                    const rawGroupName = String(getVal(cols.group)).trim();
-                    const groupName = cleanGroupName(rawGroupName); // Group Name Consolidation
+                    // Standard loose check
+                    if (!rowDate || !String(rowDate).includes(pickerDate)) return;
                     
-                    let proj = String(getVal(cols.proj)).trim();
-                    
-                    // Project Cleaning Optimization: Remove content wrapped in 【】
-                    proj = proj.replace(/【.*?】/g, '').trim(); 
-                    
-                    let idVal = String(getVal(cols.id)).trim();
-                    let content = String(getVal(cols.content)).trim();
-                    let link = String(getVal(cols.link)).trim();
-                    
-                    const hrsVal = getVal(cols.hours);
-                    const hours = parseFloat(hrsVal) || 0;
-
-                    fetchedData.push({
-                        name: name,
-                        group: groupName, // Storing the CLEANED group name
-                        project: proj,
-                        issue: idVal,
-                        content: content,
-                        hours: hours,
-                        link: link
-                    });
-                    count++;
+                    const parsed = parseRow(row);
+                    if(parsed) fetchedData.push(parsed);
                 });
 
+                currentDailyData.config = { sheetId, cols }; // Save config
                 currentDailyData.rows = fetchedData;
                 updateStatus(`成功：已讀取 ${currentDailyData.rows.length} 筆資料`, 'success');
-                saveCurrentReport(); // Automatic save on successful fetch
+                saveCurrentReport(); 
                 updateRawPreview();
                 showToast('資料已更新並儲存');
                 
-                // Switch back to overview only if not already on source tab
                 if (activeTab !== 'OVERVIEW') {
                     switchTab('OVERVIEW');
                 } else {
-                    renderData(); // Rerender if already on Overview
+                    renderData();
                 }
             }
         }
