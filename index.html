@@ -1334,12 +1334,26 @@
             const sorted = [...userList].sort((a,b) => b.totalHours - a.totalHours);
 
             let rows = '';
-            sorted.forEach(u => {
+sorted.forEach(u => {
+                // 預設為綠色 (例如剛好 8.0 小時)
                 let barColor = 'bg-emerald-500';
                 let hoursClass = 'text-emerald-700';
-                if (u.totalHours < 8) { barColor = 'bg-amber-400'; hoursClass = 'text-amber-700'; }
-                else if (u.totalHours > 10) { barColor = 'bg-rose-500'; hoursClass = 'text-rose-700'; }
-                
+
+                if (u.totalHours < 8) { 
+                    // 小於 8 小時：黃色
+                    barColor = 'bg-amber-400'; 
+                    hoursClass = 'text-amber-700'; 
+                }
+                else if (u.totalHours > 10) { 
+                    // 大於 10 小時：紅色
+                    barColor = 'bg-rose-500'; 
+                    hoursClass = 'text-rose-700'; 
+                }
+                else if (u.totalHours > 8.4) { 
+                    // 新增：大於 8.4 且 小於等於 10 (即 8.5 ~ 10.0)：橘色
+                    barColor = 'bg-orange-500'; 
+                    hoursClass = 'text-orange-700'; 
+                }  
                 let width = Math.min((u.totalHours / 12) * 100, 100);
                 
                 // Clean Name & Group
@@ -1754,12 +1768,23 @@
             
             document.getElementById('analysisSection').classList.remove('hidden');
 
-            userList.forEach(u => {
+                 userList.forEach(u => {
+                // 預設為綠色
                 let hoursColor = 'bg-emerald-100 text-emerald-800';
-                if (u.totalHours < 8) hoursColor = 'bg-amber-100 text-amber-800';
-                if (u.totalHours > 10) hoursColor = 'bg-rose-100 text-rose-800';
+
+                if (u.totalHours < 8) {
+                    // 小於 8 小時：黃色
+                    hoursColor = 'bg-amber-100 text-amber-800';
+                } else if (u.totalHours > 10) {
+                    // 大於 10 小時：紅色
+                    hoursColor = 'bg-rose-100 text-rose-800';
+                } else if (u.totalHours > 8.4) {
+                    // 新增：8.5 ~ 10.0 小時：橘色
+                    hoursColor = 'bg-orange-100 text-orange-800';
+                }
 
                 const card = document.createElement('div');
+                // ...
                 card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
                 
                 // Add ID for anchor scroll (Adjustment 2)
