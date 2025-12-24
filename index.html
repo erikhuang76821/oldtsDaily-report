@@ -425,13 +425,7 @@
                             </h3>
                             <!-- Filter Buttons (Now flowing immediately after heading) -->
                             <div id="groupFilterButtons" class="flex flex-wrap gap-1.5 pt-1">
-                                <!-- Filter Buttons -->
-                                <button class="filter-btn active" data-group="ALL" onclick="filterByGroup('ALL')">全部</button>
-                                <button class="filter-btn" data-group="品檢" onclick="filterByGroup('品檢')">品檢</button>
-                                <button class="filter-btn" data-group="網頁" onclick="filterByGroup('網頁')">網頁</button>
-                                <button class="filter-btn" data-group="資料庫" onclick="filterByGroup('資料庫')">資料庫</button>
-                                <button class="filter-btn" data-group="客服" onclick="filterByGroup('客服')">客服</button>
-                                <button class="filter-btn" data-group="技術" onclick="filterByGroup('技術')">技術</button>
+                                <!-- Buttons will be injected by JS -->
                             </div>
                         </div>
 
@@ -633,7 +627,8 @@
             { alias: '品檢', originals: ['品檢組', '品檢'] },
             { alias: '技術', originals: ['技術', '技術組'] },
             { alias: '網頁', originals: ['網頁組', '網頁'] },
-            { alias: '客服組', originals: ['客服組', '【客服組】'] }
+            { alias: '資料庫', originals: ['資料庫組', '資料庫'] },
+            { alias: '客服', originals: ['客服組', '【客服組】'] }
         ];
 
         // Global Settings Model:
@@ -1030,12 +1025,25 @@
                 resultSection.classList.add('hidden');
                 emptyState.classList.remove('hidden');
                 document.getElementById('headerTotalManHours').innerText = "0 人 / 0.0hr";
+                // Clear buttons on empty state
+                document.getElementById('groupFilterButtons').innerHTML = '';
                 return;
             }
 
             analysisSection.classList.remove('hidden');
             resultSection.classList.remove('hidden');
             emptyState.classList.add('hidden');
+
+            // 0. Dynamic Filter Buttons Generation (Fix for Group Tag Mismatch)
+            // Extract unique groups from the actual data
+            const uniqueGroups = Array.from(new Set(rawRows.map(r => r.group))).sort();
+            
+            // Safety check: if current active filter no longer exists in data, reset to ALL
+            if (activeFilterGroup !== 'ALL' && !uniqueGroups.includes(activeFilterGroup)) {
+                activeFilterGroup = 'ALL';
+            }
+            
+            renderDynamicFilterButtons(uniqueGroups);
 
             // 1. Group by User (Grouping uses the CLEANED group name already stored in rows)
             const userMap = {};
@@ -1086,6 +1094,35 @@
 
             // 4. Render Project Pie Chart - Uses filtered list data
             renderProjectStats(filteredUserList);
+        }
+
+        // NEW: Function to render filter buttons dynamically
+        function renderDynamicFilterButtons(groups) {
+            const container = document.getElementById('groupFilterButtons');
+            if (!container) return;
+
+            // Always add 'ALL' button first
+            let html = `
+                <button class="filter-btn ${activeFilterGroup === 'ALL' ? 'active' : ''}" 
+                        data-group="ALL" 
+                        onclick="filterByGroup('ALL')">
+                    全部
+                </button>
+            `;
+
+            groups.forEach(group => {
+                if (!group) return; // skip empty
+                const isActive = (activeFilterGroup === group);
+                html += `
+                    <button class="filter-btn ${isActive ? 'active' : ''}" 
+                            data-group="${group}" 
+                            onclick="filterByGroup('${group}')">
+                        ${group}
+                    </button>
+                `;
+            });
+
+            container.innerHTML = html;
         }
 
 
@@ -1566,7 +1603,7 @@
                 `}).join('');
 
                 card.innerHTML = `
-                    <div class="p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0">
+                    <div onclick="toggleAllTasks(this)" class="cursor-pointer hover:bg-slate-100 transition p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0" title="點擊展開/收合所有項目">
                         <div class="flex flex-col items-center">
                             <div class="text-[10px] text-slate-400 font-bold mb-0.5">${u.group}</div>
                             <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap truncate w-full px-1" title="${u.name}">
@@ -1578,6 +1615,34 @@
                     <div class="flex-1 bg-white flex flex-col">${tasksHtml}</div>
                 `;
                 container.appendChild(card);
+            });
+        }
+
+        function toggleAllTasks(headerEl) {
+            const card = headerEl.parentElement;
+            const buttons = card.querySelectorAll('.accordion-btn');
+            const contents = card.querySelectorAll('.accordion-content');
+            
+            // 檢查是否全部都已經展開 (若全部展開，則動作為收合；若有任一未展開，則動作為全展開)
+            const allExpanded = Array.from(buttons).every(btn => btn.getAttribute('aria-expanded') === 'true');
+            const newState = !allExpanded;
+
+            buttons.forEach(btn => {
+                btn.setAttribute('aria-expanded', newState);
+                // 同步旋轉箭頭 icon
+                const icon = btn.querySelector('.accordion-icon');
+                if (icon) {
+                    if (newState) icon.style.transform = 'rotate(180deg)';
+                    else icon.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            contents.forEach(content => {
+                if (newState) {
+                    content.classList.add('expanded', 'p-3', 'pt-0');
+                } else {
+                    content.classList.remove('expanded', 'p-3', 'pt-0');
+                }
             });
         }
 
