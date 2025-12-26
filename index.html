@@ -614,6 +614,32 @@
         </div>
     </div>
 
+    <!-- Edit Group Rule Modal (New) -->
+    <div id="editGroupDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
+            <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700">編輯來源規則</h3>
+                <button onclick="closeEditGroupDialog()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">顯示名稱 (Alias)</label>
+                    <input type="text" id="editGroupAliasInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">原始名稱 (逗號分隔)</label>
+                    <input type="text" id="editGroupSourcesInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition">
+                </div>
+            </div>
+            <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
+                <button onclick="closeEditGroupDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="saveEditedGroupRule()" class="px-4 py-2 rounded text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">儲存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
 
@@ -638,6 +664,7 @@
         let isMergeMode = false; // Track if we are in merge selection mode
         let ruleToDeleteIndex = -1; // Track index for deletion
         let ruleToEditIndex = -1; // Track index for editing
+        let ruleToEditGroupIndex = -1; // Track index for editing group rules
         let deleteType = ''; // 'project' or 'group'
         let autoRefreshTimer = null; // FEATURE 1: Timer ID
         
@@ -1092,7 +1119,10 @@
                 if (!name) return null;
 
                 const rawGroupName = String(getVal(cols.group)).trim();
-                const groupName = cleanGroupName(rawGroupName);
+                
+                // --- MODIFIED: Store raw group name here, cleaning is done in renderData for flexibility ---
+                const groupName = rawGroupName; 
+                
                 let proj = String(getVal(cols.proj)).trim().replace(/【.*?】/g, '').trim();
                 let idVal = String(getVal(cols.id)).trim();
                 let content = String(getVal(cols.content)).trim();
@@ -1236,7 +1266,7 @@
 
             // 0. Dynamic Filter Buttons Generation (Fix for Group Tag Mismatch)
             // Extract unique groups from the actual data
-            const uniqueGroups = Array.from(new Set(rawRows.map(r => r.group))).sort();
+            const uniqueGroups = Array.from(new Set(rawRows.map(r => cleanGroupName(r.group)))).sort();
             
             // Safety check: if current active filter no longer exists in data, reset to ALL
             if (activeFilterGroup !== 'ALL' && !uniqueGroups.includes(activeFilterGroup)) {
@@ -1250,10 +1280,14 @@
             let totalHoursGlobal = 0;
 
             rawRows.forEach(row => {
+                // Ensure dynamic update of group name based on current settings
+                const dynamicGroup = cleanGroupName(row.group);
+
                 if (!userMap[row.name]) {
                     userMap[row.name] = { 
                         name: row.name, 
-                        group: row.group || '其他', // Use the cleaned group name stored
+                        group: dynamicGroup || '其他', 
+                        originalGroup: row.group || '其他', // NEW: Store original for display
                         totalHours: 0, 
                         tasks: [] 
                     };
@@ -1285,6 +1319,12 @@
             filteredUserList.forEach(u => filteredHours += u.totalHours);
             const filteredStatsText = `${filteredUserList.length}人 / ${filteredHours.toFixed(1)}hr`;
             document.getElementById('widgetTotalManHours').innerText = filteredStatsText;
+
+            // Sort for Detail View (Group > Hours) to create small group concepts
+            filteredUserList.sort((a, b) => {
+                if (a.group !== b.group) return a.group.localeCompare(b.group, 'zh-Hant');
+                return b.totalHours - a.totalHours;
+            });
 
             // 2. Render Detail View (NOW TOP) - Uses filtered list
             renderDetailList(filteredUserList);
@@ -1334,26 +1374,12 @@
             const sorted = [...userList].sort((a,b) => b.totalHours - a.totalHours);
 
             let rows = '';
-sorted.forEach(u => {
-                // 預設為綠色 (例如剛好 8.0 小時)
+            sorted.forEach(u => {
                 let barColor = 'bg-emerald-500';
                 let hoursClass = 'text-emerald-700';
-
-                if (u.totalHours < 8) { 
-                    // 小於 8 小時：黃色
-                    barColor = 'bg-amber-400'; 
-                    hoursClass = 'text-amber-700'; 
-                }
-                else if (u.totalHours > 10) { 
-                    // 大於 10 小時：紅色
-                    barColor = 'bg-rose-500'; 
-                    hoursClass = 'text-rose-700'; 
-                }
-                else if (u.totalHours > 8.4) { 
-                    // 新增：大於 8.4 且 小於等於 10 (即 8.5 ~ 10.0)：橘色
-                    barColor = 'bg-orange-500'; 
-                    hoursClass = 'text-orange-700'; 
-                }  
+                if (u.totalHours < 8) { barColor = 'bg-amber-400'; hoursClass = 'text-amber-700'; }
+                else if (u.totalHours > 10) { barColor = 'bg-rose-500'; hoursClass = 'text-rose-700'; }
+                
                 let width = Math.min((u.totalHours / 12) * 100, 100);
                 
                 // Clean Name & Group
@@ -1635,6 +1661,55 @@ sorted.forEach(u => {
             document.getElementById('confirmDialogOverlay').classList.remove('hidden');
         }
 
+        // --- EDIT GROUP RULE LOGIC (New) ---
+        function openEditGroupRule(index) {
+            ruleToEditGroupIndex = index;
+            const rule = globalSettings.groupMerges[index];
+            if (!rule) return;
+
+            const aliasInput = document.getElementById('editGroupAliasInput');
+            const sourcesInput = document.getElementById('editGroupSourcesInput');
+            
+            aliasInput.value = rule.alias;
+            sourcesInput.value = rule.originals.join(', ');
+            
+            document.getElementById('editGroupDialogOverlay').classList.remove('hidden');
+            aliasInput.focus();
+        }
+
+        function closeEditGroupDialog() {
+            document.getElementById('editGroupDialogOverlay').classList.add('hidden');
+            ruleToEditGroupIndex = -1;
+        }
+
+        function saveEditedGroupRule() {
+            if (ruleToEditGroupIndex === -1) return;
+            
+            const aliasInput = document.getElementById('editGroupAliasInput');
+            const sourcesInput = document.getElementById('editGroupSourcesInput');
+            
+            const newAlias = aliasInput.value.trim();
+            const newSourcesRaw = sourcesInput.value.trim();
+
+            if (!newAlias || !newSourcesRaw) {
+                return alert('請填寫完整資訊');
+            }
+
+            const newSources = newSourcesRaw.split(/[,\s，]+/).filter(s => s.trim() !== '');
+            if (newSources.length === 0) return alert('請輸入至少一個原始名稱');
+
+            // Update
+            globalSettings.groupMerges[ruleToEditGroupIndex] = {
+                alias: newAlias,
+                originals: newSources
+            };
+            saveGlobalSettings();
+            
+            closeEditGroupDialog();
+            renderData();
+            showToast('來源規則已更新');
+        }
+
         function deleteProjectRule(index) {
             ruleToDeleteIndex = index;
             deleteType = 'project';
@@ -1749,9 +1824,14 @@ sorted.forEach(u => {
                             ${rule.originals.join(', ')}
                         </div>
                     </div>
-                    <button onclick="deleteGroupRule(${index})" class="text-slate-300 hover:text-rose-500 p-2 ml-1 transition" title="刪除規則">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
+                    <div class="flex items-center">
+                        <button onclick="openEditGroupRule(${index})" class="text-slate-300 hover:text-emerald-600 p-2 transition" title="編輯規則">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button onclick="deleteGroupRule(${index})" class="text-slate-300 hover:text-rose-500 p-2 transition" title="刪除規則">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
         }
@@ -1768,23 +1848,12 @@ sorted.forEach(u => {
             
             document.getElementById('analysisSection').classList.remove('hidden');
 
-                 userList.forEach(u => {
-                // 預設為綠色
+            userList.forEach(u => {
                 let hoursColor = 'bg-emerald-100 text-emerald-800';
-
-                if (u.totalHours < 8) {
-                    // 小於 8 小時：黃色
-                    hoursColor = 'bg-amber-100 text-amber-800';
-                } else if (u.totalHours > 10) {
-                    // 大於 10 小時：紅色
-                    hoursColor = 'bg-rose-100 text-rose-800';
-                } else if (u.totalHours > 8.4) {
-                    // 新增：8.5 ~ 10.0 小時：橘色
-                    hoursColor = 'bg-orange-100 text-orange-800';
-                }
+                if (u.totalHours < 8) hoursColor = 'bg-amber-100 text-amber-800';
+                if (u.totalHours > 10) hoursColor = 'bg-rose-100 text-rose-800';
 
                 const card = document.createElement('div');
-                // ...
                 card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
                 
                 // Add ID for anchor scroll (Adjustment 2)
@@ -1830,7 +1899,7 @@ sorted.forEach(u => {
                 card.innerHTML = `
                     <div onclick="toggleAllTasks(this)" class="cursor-pointer hover:bg-slate-100 transition p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0" title="點擊展開/收合所有項目">
                         <div class="flex flex-col items-center">
-                            <div class="text-[10px] text-slate-400 font-bold mb-0.5">${u.group}</div>
+                            <div class="text-[10px] text-slate-400 font-bold mb-0.5">${u.originalGroup}</div>
                             <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap truncate w-full px-1" title="${u.name}">
                                 ${shortName}
                             </div>
