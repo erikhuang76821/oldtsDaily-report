@@ -218,22 +218,25 @@
                             <div class="flex items-center gap-2">
                                 <!-- Removed Alarm Clock Icon -->
                                 <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="chkAutoRefreshToggle" class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" onchange="toggleAutoRefreshPanel()">
+                                    <!-- 預設勾選 (checked) -->
+                                    <input type="checkbox" id="chkAutoRefreshToggle" class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" onchange="toggleAutoRefreshPanel()" checked>
                                     <span class="text-sm font-bold text-slate-700">自動刷新設定</span>
                                 </label>
                             </div>
                             
-                            <div id="autoRefreshConfigPanel" class="hidden flex-1 flex flex-wrap items-center gap-2">
+                            <!-- 預設顯示 (移除 hidden) -->
+                            <div id="autoRefreshConfigPanel" class="flex flex-1 flex flex-wrap items-center gap-2">
                                 <span class="text-xs text-slate-500 ml-2">範圍:</span>
                                 <select id="selAutoRefreshRange" class="border border-slate-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none cursor-pointer bg-white">
-                                    <option value="3">近 3 天</option>
+                                    <option value="3" selected>近 3 天</option>
                                     <option value="7">近 7 天</option>
                                     <option value="30">近 1 個月</option>
                                     <option value="ALL">全部</option>
                                 </select>
 
                                 <span class="text-xs text-slate-500 ml-2">每隔</span>
-                                <input type="number" id="inpAutoRefreshMinutes" value="5" min="1" class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-blue-500 focus:outline-none">
+                                <!-- 預設 10 分鐘 -->
+                                <input type="number" id="inpAutoRefreshMinutes" value="10" min="1" class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-blue-500 focus:outline-none">
                                 <span class="text-xs text-slate-500">分鐘</span>
                                 
                                 <button onclick="confirmAutoRefresh()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition ml-auto md:ml-0">
@@ -258,7 +261,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1 text-emerald-600">組別 (Group)</label>
-                                    <input type="number" id="colGroup" class="w-full border border-emerald-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-emerald-50 text-emerald-700" value="1">
+                                    <input type="number" id="colGroup" class="w-full border border-emerald-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-emerald-50 text-emerald-700" value="8">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">填寫者 (Author)</label>
@@ -687,18 +690,19 @@
         let currentDailyData = {
             config: {
                 sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
-                cols: { date: 0, group: 1, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
+                cols: { date: 0, group: 8, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
             },
             rows: []
         };
         
         // Default Group Merges requested by user
         const DEFAULT_GROUP_MERGES = [
-            { alias: '品檢', originals: ['品檢組', '品檢'] },
+            { alias: '品檢', originals: ['品檢組', '品檢','品檢_早班','品檢_中班','品檢_緯創'] },
             { alias: '技術', originals: ['技術', '技術組'] },
-            { alias: '網頁', originals: ['網頁組', '網頁'] },
-            { alias: '資料庫', originals: ['資料庫組', '資料庫'] },
-            { alias: '客服', originals: ['客服組', '【客服組】'] }
+            { alias: '網頁系統', originals: ['網頁系統_前端', '網頁系統_後端','網頁系統','網頁系統_實習生','網頁系統_外包','網頁系統_緯創'] },
+            { alias: '資料庫', originals: ['資料庫組', '資料庫','資料庫_智能行銷'] },
+            { alias: '資源整合應用', originals: ['資源整合應用_自動化', '資源整合應用_企劃'] },
+            { alias: '客服', originals: ['客服組', '【客服組】','客服_VIP','客服_值班者'] }
         ];
 
         // Global Settings Model:
@@ -726,6 +730,14 @@
             updateHistoryList();
             loadReportByDate(today);
             
+            // --- 預設自動刷新邏輯開始 ---
+            // 1. 立即刷新一次近3天資料
+            fetchGoogleSheetData('3');
+            
+            // 2. 啟動自動刷新計時器 (10分鐘, 近3天)
+            startAutoRefresh(10, '3');
+            // --- 預設自動刷新邏輯結束 ---
+
             // Initial scroll listener setup
             const scrollContainer = document.getElementById('scrollContainer');
             if (scrollContainer) {
@@ -1037,7 +1049,7 @@
             // --- Capture Config ---
             const cols = {
                 date: parseInt(document.getElementById('colDate').value) || 0,
-                group: parseInt(document.getElementById('colGroup').value) || 1,
+                group: parseInt(document.getElementById('colGroup').value) || 8,
                 name: parseInt(document.getElementById('colName').value) || 2,
                 proj: parseInt(document.getElementById('colProj').value) || 3,
                 id:   parseInt(document.getElementById('colId').value) || 4,
@@ -1320,9 +1332,16 @@
             const filteredStatsText = `${filteredUserList.length}人 / ${filteredHours.toFixed(1)}hr`;
             document.getElementById('widgetTotalManHours').innerText = filteredStatsText;
 
-            // Sort for Detail View (Group > Hours) to create small group concepts
+            // Sort for Detail View (Group > Original Group > Hours) to create small group concepts
+            // 修正：加入 originalGroup (副標) 作為第二排序條件，避免同組別內不同班別混雜
             filteredUserList.sort((a, b) => {
+                // Primary: Main Group (Cleaned)
                 if (a.group !== b.group) return a.group.localeCompare(b.group, 'zh-Hant');
+                
+                // Secondary: Original Group (Sub-group) - 確保如 "品檢_早班" 與 "品檢_中班" 會分開聚集
+                if (a.originalGroup !== b.originalGroup) return a.originalGroup.localeCompare(b.originalGroup, 'zh-Hant');
+                
+                // Tertiary: Hours Descending
                 return b.totalHours - a.totalHours;
             });
 
@@ -2329,9 +2348,9 @@
                                     toggleProjectSelection(label);
                                 } else {
                                     if (activeTrendFilter === label) {
-                                        activeTrendFilter = null;
+                                         activeTrendFilter = null;
                                     } else {
-                                        activeTrendFilter = label;
+                                         activeTrendFilter = label;
                                     }
                                     setTimeout(() => renderTrendAnalysis(), 0);
                                 }
