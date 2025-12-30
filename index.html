@@ -390,12 +390,23 @@
             <!-- Settings Tab (Control Panel) -->
             <section id="settingsSection" class="hidden max-w-4xl mx-auto space-y-6">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h2 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                             <i class="fa-solid fa-sliders"></i>
-                        </span>
-                        控制台 (全局設定)
-                    </h2>
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                        <h2 class="font-bold text-slate-700 text-lg flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                                <i class="fa-solid fa-sliders"></i>
+                            </span>
+                            控制台 (全局設定)
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="exportSettings()" class="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                <i class="fa-solid fa-download"></i> 匯出設定
+                            </button>
+                            <label class="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1 cursor-pointer">
+                                <i class="fa-solid fa-upload"></i> 匯入設定
+                                <input type="file" id="importSettingsFile" class="hidden" onchange="importSettings(this)" accept=".json">
+                            </label>
+                        </div>
+                    </div>
                     
                     <!-- 1. Source Flexibility Settings (Group Merges) - NEW -->
                     <div class="space-y-4 mb-8">
@@ -2547,6 +2558,49 @@
                     showToast('資料還原成功');
                 } catch (error) {
                     showToast('檔案格式錯誤');
+                }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        // --- Settings Import/Export Logic ---
+        function exportSettings() {
+            if (!globalSettings) return showToast('無設定可匯出');
+            const dataStr = JSON.stringify(globalSettings, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `daily_report_settings_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('設定(組別/專案規則)已匯出');
+        }
+
+        function importSettings(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    // Simple validation to ensure it's a settings file
+                    if (data.projectMerges || data.groupMerges) {
+                        // Merge imported settings into globalSettings
+                        if (data.projectMerges) globalSettings.projectMerges = data.projectMerges;
+                        if (data.groupMerges) globalSettings.groupMerges = data.groupMerges;
+                        
+                        saveGlobalSettings(); // Saves to LS and refreshes Settings tab
+                        renderData(); // Refresh overview in case rules affected current view
+                        showToast('設定匯入成功');
+                    } else {
+                        showToast('無效的設定檔格式');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    showToast('檔案格式錯誤或解析失敗');
                 }
                 input.value = '';
             };
