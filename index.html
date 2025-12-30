@@ -1220,13 +1220,21 @@
                 
                 // Refresh UI if current date was affected, or just stay put
                 if (currentReportDate && db[currentReportDate]) {
-                    loadReportByDate(currentReportDate);
+                    // 修正：加入 true 參數，表示這是背景刷新，不強制切換 Tab
+                    loadReportByDate(currentReportDate, true);
                 } else {
                     // Update list only
                     updateHistoryList();
+                    // 如果當前在趨勢分析，且有新資料進來(雖然不是當前選定日期)，也應該刷新趨勢圖
+                    if (activeTab === 'ANALYSIS') renderTrendAnalysis();
                 }
                 
-                updateStatus(`自動刷新完成 (範圍: ${autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天'}, 更新 ${updateCount} 天)`, 'success');
+                const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天';
+                const msg = `自動刷新完成 (範圍: ${rangeLabel}, 更新 ${updateCount} 天)`;
+                
+                updateStatus(msg, 'success');
+                // 新增：跳出 Toast 通知
+                showToast(msg);
 
             } else {
                 // === MANUAL SINGLE DATE MODE ===
@@ -2435,7 +2443,8 @@
         }
 
         // --- HISTORY & DATA MANAGER ---
-        function loadReportByDate(date) {
+        // 修正：增加 preventTabSwitch 參數 (預設 false 維持原有手動點擊的行為)
+        function loadReportByDate(date, preventTabSwitch = false) {
             currentReportDate = date;
             document.getElementById('reportDatePicker').value = date;
             updateHistoryList();
@@ -2453,9 +2462,19 @@
                 }
             }
             
-            // Auto switch to overview if data exists, else source
-            if (currentDailyData.rows.length > 0) switchTab('OVERVIEW');
-            else switchTab('SOURCE');
+            // 邏輯分流
+            if (preventTabSwitch) {
+                // 背景刷新模式：不切換 Tab，但若當前視圖需要資料，則原地刷新
+                if (activeTab === 'OVERVIEW') {
+                    renderData();
+                } else if (activeTab === 'ANALYSIS') {
+                    renderTrendAnalysis();
+                }
+            } else {
+                // 手動模式 (或初次載入)：Auto switch to overview if data exists, else source
+                if (currentDailyData.rows.length > 0) switchTab('OVERVIEW');
+                else switchTab('SOURCE');
+            }
         }
 
         // Renamed function and updated logic to switch to previous day
