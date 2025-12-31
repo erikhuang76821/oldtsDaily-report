@@ -121,19 +121,7 @@
             </div>
         </div>
 
-        <div class="p-4 border-t border-slate-200 bg-slate-50">
-            <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">資料管理</h3>
-            <div class="flex gap-2">
-                <button onclick="exportData()" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition" title="匯出 JSON">
-                    <i class="fa-solid fa-download"></i> 備份
-                </button>
-                <label class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 py-1.5 rounded text-xs transition text-center cursor-pointer" title="匯入 JSON">
-                    <i class="fa-solid fa-upload"></i> 還原
-                    <input type="file" id="importFile" class="hidden" onchange="importData(this)" accept=".json">
-                </label>
-            </div>
-            <!-- Removed the clearAllData button/link -->
-        </div>
+        <!-- 移除原有的資料管理區塊 (Point 2) -->
     </aside>
 
     <!-- Main Content -->
@@ -290,10 +278,17 @@
                             </div>
                         </div>
 
-                        <div class="pt-2 flex items-center justify-between">
-                            <div id="gsheetStatusMsg" class="text-sm font-medium"></div>
+                        <div class="pt-2 flex items-center justify-between gap-4">
+                            <div id="gsheetStatusMsg" class="text-sm font-medium mr-auto"></div>
+                            
+                            <!-- 新增：紅色讀取全部按鈕 (Point 4) -->
+                            <button onclick="openReadAllConfirm()" class="bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-2 transform hover:-translate-y-0.5" title="讀取所有歷史資料">
+                                <i class="fa-solid fa-layer-group"></i> <span class="hidden md:inline">讀取全部</span>
+                            </button>
+
+                            <!-- 修改：讀取當日資料 (Point 3) -->
                             <button onclick="fetchGoogleSheetData()" id="btnFetchGSheet" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-green-600/20 transition flex items-center gap-2 transform hover:-translate-y-0.5">
-                                <i class="fa-solid fa-cloud-arrow-down"></i> 讀取資料
+                                <i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料
                             </button>
                         </div>
                     </div>
@@ -339,6 +334,9 @@
                                 <option value="7">最近 7 天</option>
                                 <option value="14">最近 14 天</option>
                                 <option value="30">最近 30 天</option>
+                                <option value="90">最近 3 個月</option>
+                                <option value="180">最近 6 個月</option>
+                                <option value="365">最近 1 年</option>
                             </select>
                         </div>
                     </div>
@@ -591,18 +589,18 @@
         </div>
     </div>
 
-    <!-- Confirm Delete Modal (New) -->
+    <!-- Generalized Confirm Modal (Replaced Delete Modal) -->
     <div id="confirmDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
             <div class="p-6 text-center">
-                <div class="w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fa-solid fa-trash-can text-xl"></i>
+                <div class="w-12 h-12 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-4" id="confirmIconContainer">
+                    <i class="fa-solid fa-circle-question text-xl"></i>
                 </div>
-                <h3 class="font-bold text-slate-700 text-lg mb-2">移除規則</h3>
-                <p class="text-sm text-slate-500 mb-6">確定要刪除此規則嗎？</p>
+                <h3 class="font-bold text-slate-700 text-lg mb-2" id="confirmTitle">確認操作</h3>
+                <p class="text-sm text-slate-500 mb-6" id="confirmMessage">確定要執行此操作嗎？</p>
                 <div class="flex gap-3 justify-center">
                     <button onclick="closeConfirmDialog()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition flex-1">取消</button>
-                    <button onclick="executeDeleteRule()" class="px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition flex-1 shadow-lg shadow-rose-200">確認刪除</button>
+                    <button onclick="executeConfirm()" id="confirmActionBtn" class="px-4 py-2 rounded-lg text-sm font-bold bg-corp-600 text-white hover:bg-corp-700 transition flex-1 shadow-lg shadow-corp-200">確認</button>
                 </div>
             </div>
         </div>
@@ -659,12 +657,12 @@
 
     <!-- Floating Buttons Container (FEATURE 2) -->
     <!-- Up Arrow (Back to Top / Result) - Now at bottom-24 -->
-    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-24 right-5 md:bottom-24 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5">
+    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-24 right-5 md:bottom-24 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5 hidden">
         <i class="fa-solid fa-arrow-up text-xl"></i>
     </button>
 
     <!-- Down Arrow (Go to Analysis) - Now at bottom-5 (Swapped Position, Matching Style, Larger Icon) -->
-    <button onclick="scrollToAnalysis()" id="goToAnalysisBtn" class="fixed bottom-5 right-5 md:bottom-5 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 transform translate-y-0">
+    <button onclick="scrollToAnalysis()" id="goToAnalysisBtn" class="fixed bottom-5 right-5 md:bottom-5 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 transform translate-y-0 hidden">
         <i class="fa-solid fa-arrow-down text-xl"></i>
     </button>
 
@@ -676,10 +674,13 @@
         let projectChartInstance = null; // Store chart instance
         let trendChartInstance = null; // Store trend chart instance (New)
         let isMergeMode = false; // Track if we are in merge selection mode
-        let ruleToDeleteIndex = -1; // Track index for deletion
+        
+        let ruleToDeleteIndex = -1; // Track index for deletion (Legacy use inside confirm)
         let ruleToEditIndex = -1; // Track index for editing
         let ruleToEditGroupIndex = -1; // Track index for editing group rules
         let deleteType = ''; // 'project' or 'group'
+        let onConfirmAction = null; // Callback for generic confirm modal
+
         let autoRefreshTimer = null; // FEATURE 1: Timer ID
         
         // Analysis State
@@ -693,11 +694,7 @@
 
         let currentTotalEntitiesCount = 0; // NEW: To track total count for "Select All" logic (shared context)
         
-        // Data Model:
-        // { 
-        //   config: { sheetId: '', cols: {...} },
-        //   rows: [ { name, group, project, issue, content, hours, link } ]
-        // }
+        // Data Model
         let currentDailyData = {
             config: {
                 sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
@@ -716,8 +713,7 @@
             { alias: '客服', originals: ['客服組', '【客服組】','客服_VIP','客服_值班者'] }
         ];
 
-        // Global Settings Model:
-        // { projectMerges: [...], groupMerges: [...] }
+        // Global Settings Model
         let globalSettings = {
             projectMerges: [],
             groupMerges: []
@@ -742,10 +738,7 @@
             loadReportByDate(today);
             
             // --- 預設自動刷新邏輯開始 ---
-            // 1. 立即刷新一次近3天資料
             fetchGoogleSheetData('3');
-            
-            // 2. 啟動自動刷新計時器 (10分鐘, 近3天)
             startAutoRefresh(10, '3');
             // --- 預設自動刷新邏輯結束 ---
 
@@ -753,7 +746,6 @@
             const scrollContainer = document.getElementById('scrollContainer');
             if (scrollContainer) {
                 scrollContainer.addEventListener('scroll', handleScroll);
-                // Call once to set initial button state
                 handleScroll();
             }
             
@@ -761,7 +753,6 @@
                 switchTab('SOURCE');
             }
             
-            // Fix: Initialize Analysis Mode UI
             setAnalysisMode('PROJECT'); 
         });
 
@@ -773,7 +764,6 @@
                 if (!globalSettings.projectMerges) globalSettings.projectMerges = [];
                 if (!globalSettings.groupMerges) globalSettings.groupMerges = JSON.parse(JSON.stringify(DEFAULT_GROUP_MERGES));
             } else {
-                // Initialize with defaults
                 globalSettings.groupMerges = JSON.parse(JSON.stringify(DEFAULT_GROUP_MERGES));
                 saveGlobalSettings();
             }
@@ -794,7 +784,7 @@
             } else {
                 panel.classList.add('hidden');
                 panel.classList.remove('flex');
-                stopAutoRefresh(); // Uncheck implies stop
+                stopAutoRefresh();
             }
         }
 
@@ -811,9 +801,8 @@
         }
 
         function startAutoRefresh(minutes, range) {
-            stopAutoRefresh(); // Clear existing
+            stopAutoRefresh(); 
             
-            // Update UI status
             const badge = document.getElementById('badgeAutoRefreshStatus');
             badge.className = "text-[10px] font-bold px-2 py-1 rounded border bg-green-100 text-green-600 border-green-200 animate-pulse";
             badge.innerHTML = `<i class="fa-solid fa-circle-play mr-1"></i> 每 ${minutes} 分鐘刷新`;
@@ -825,12 +814,10 @@
             
             showToast(`已啟用自動刷新 (每 ${minutes} 分鐘, 範圍: ${rangeLabel})`);
             
-            // Set Interval
             autoRefreshTimer = setInterval(() => {
-                // Only fetch if we have an ID
                 const id = document.getElementById('gsheetId').value;
                 if(id) {
-                    fetchGoogleSheetData(range); // Pass range to fetch function
+                    fetchGoogleSheetData(range); 
                 }
             }, minutes * 60 * 1000);
         }
@@ -848,10 +835,15 @@
         // --- SCROLL LISTENERS & ACTIONS ---
         function handleScroll() {
             const scrollContainer = document.getElementById('scrollContainer');
-            const upBtn = document.getElementById('backToResultBtn'); // Now Up arrow
-            const downBtn = document.getElementById('goToAnalysisBtn'); // Now Down arrow
+            const upBtn = document.getElementById('backToResultBtn'); 
+            const downBtn = document.getElementById('goToAnalysisBtn'); 
             
             if (!scrollContainer) return;
+
+            // Only act if we are in OVERVIEW tab (Point 1 fix)
+            if (activeTab !== 'OVERVIEW') {
+                return;
+            }
 
             const scrollTop = scrollContainer.scrollTop;
             const scrollHeight = scrollContainer.scrollHeight;
@@ -859,7 +851,7 @@
 
             // Logic for UP Arrow
             if (scrollTop > 400) {
-                upBtn.classList.remove('opacity-0', 'translate-y-5');
+                upBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); // ensure not hidden
                 upBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
                 upBtn.classList.remove('opacity-100', 'translate-y-0');
@@ -867,12 +859,9 @@
             }
 
             // Logic for DOWN Arrow
-            // Hide if we are close to the bottom (Analysis section)
             const isNearBottom = (scrollHeight - scrollTop - clientHeight) < 200;
-            
-            // Only show down arrow if there is scrollable content and we aren't near bottom
             if (scrollHeight > clientHeight + 100 && !isNearBottom) {
-                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden');
+                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); // ensure not hidden
                 downBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
                 downBtn.classList.remove('opacity-100', 'translate-y-0');
@@ -894,25 +883,19 @@
             }
         }
 
-        // Helper for anchor scroll to user
         function getUserId(name) {
-            // Simple logic to generate safe ID from name (handling non-ascii if necessary, though simple replacement usually works for DOM IDs)
             return 'user_card_' + name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
         }
 
         function scrollToUser(name) {
-            // Unescape name if it was passed from onclick string
             const id = getUserId(name);
             const el = document.getElementById(id);
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Optional highlight effect
                 el.classList.add('highlight-card');
                 setTimeout(() => el.classList.remove('highlight-card'), 2000);
             }
         }
-        // --- END SCROLL ACTIONS ---
-
 
         // Sidebar Toggle Logic
         function toggleSidebar() {
@@ -956,30 +939,42 @@
             settingsSec.classList.add('hidden');
             analysisSec.classList.add('hidden');
 
+            // Floating Arrow Buttons Logic (Point 1 Fix)
+            const upBtn = document.getElementById('backToResultBtn');
+            const downBtn = document.getElementById('goToAnalysisBtn');
+
             if (tab === 'OVERVIEW') {
                 overviewSec.classList.remove('hidden');
-                renderData(); // Refresh overview
-                // Recalculate scroll arrows state
+                renderData(); 
+                // Unhide them so handleScroll can manage them (but handleScroll might hide them initially)
+                upBtn.classList.add('hidden'); 
+                downBtn.classList.add('hidden');
                 setTimeout(handleScroll, 100);
-            } else if (tab === 'ANALYSIS') {
-                analysisSec.classList.remove('hidden');
-                renderTrendAnalysis();
-            } else if (tab === 'SOURCE') {
-                sourceSec.classList.remove('hidden');
-                // Update config inputs from state
-                document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
-                document.getElementById('colDate').value = currentDailyData.config.cols.date;
-                document.getElementById('colGroup').value = currentDailyData.config.cols.group;
-                document.getElementById('colName').value = currentDailyData.config.cols.name;
-                document.getElementById('colProj').value = currentDailyData.config.cols.proj;
-                document.getElementById('colId').value = currentDailyData.config.cols.id;
-                document.getElementById('colContent').value = currentDailyData.config.cols.content;
-                document.getElementById('colHours').value = currentDailyData.config.cols.hours;
-                document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
-                updateRawPreview();
-            } else if (tab === 'SETTINGS') {
-                settingsSec.classList.remove('hidden');
-                renderSettingsTab();
+            } else {
+                // For all other tabs, FORCE HIDE
+                upBtn.classList.add('hidden');
+                downBtn.classList.add('hidden');
+                
+                if (tab === 'ANALYSIS') {
+                    analysisSec.classList.remove('hidden');
+                    renderTrendAnalysis();
+                } else if (tab === 'SOURCE') {
+                    sourceSec.classList.remove('hidden');
+                    // Update config inputs...
+                    document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
+                    document.getElementById('colDate').value = currentDailyData.config.cols.date;
+                    document.getElementById('colGroup').value = currentDailyData.config.cols.group;
+                    document.getElementById('colName').value = currentDailyData.config.cols.name;
+                    document.getElementById('colProj').value = currentDailyData.config.cols.proj;
+                    document.getElementById('colId').value = currentDailyData.config.cols.id;
+                    document.getElementById('colContent').value = currentDailyData.config.cols.content;
+                    document.getElementById('colHours').value = currentDailyData.config.cols.hours;
+                    document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
+                    updateRawPreview();
+                } else if (tab === 'SETTINGS') {
+                    settingsSec.classList.remove('hidden');
+                    renderSettingsTab();
+                }
             }
         }
 
@@ -995,16 +990,13 @@
             }
         }
 
-        // --- FILTER LOGIC ---
         function filterByGroup(groupCode) {
             if (activeFilterGroup === groupCode && groupCode !== 'ALL') {
-                // Toggle off if clicking the active filter (unless it's ALL)
                 activeFilterGroup = 'ALL';
             } else {
                 activeFilterGroup = groupCode;
             }
 
-            // Update button styles
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
                 if (btn.getAttribute('data-group') === activeFilterGroup) {
@@ -1012,20 +1004,16 @@
                 }
             });
 
-            renderData(); // Re-render content based on new filter
+            renderData();
         }
 
-        // --- HEADER UPDATE ACTION ---
         function handleHeaderAction() {
             fetchGoogleSheetData();
         }
 
-        // --- HELPER: Group Name Consolidation (UPDATED TO USE SETTINGS) ---
         function cleanGroupName(group) {
             if (!group) return '其他';
             group = group.trim();
-            
-            // Iterate through user defined rules first
             if (globalSettings.groupMerges) {
                 for (const rule of globalSettings.groupMerges) {
                     if (rule.originals.includes(group)) {
@@ -1033,16 +1021,58 @@
                     }
                 }
             }
-            
             return group;
         }
 
+        // --- NEW: GENERIC CONFIRM MODAL LOGIC (Point 4) ---
+        function showConfirmDialog(title, message, onConfirm, isDelete = false) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMessage').innerText = message;
+            
+            const btn = document.getElementById('confirmActionBtn');
+            const iconContainer = document.getElementById('confirmIconContainer');
+            
+            // Customize look based on action type
+            if (isDelete) {
+                btn.className = "px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition flex-1 shadow-lg shadow-rose-200";
+                iconContainer.className = "w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4";
+                iconContainer.innerHTML = '<i class="fa-solid fa-trash-can text-xl"></i>';
+            } else {
+                btn.className = "px-4 py-2 rounded-lg text-sm font-bold bg-corp-600 text-white hover:bg-corp-700 transition flex-1 shadow-lg shadow-corp-200";
+                iconContainer.className = "w-12 h-12 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4";
+                iconContainer.innerHTML = '<i class="fa-solid fa-circle-exclamation text-xl"></i>';
+            }
+
+            onConfirmAction = onConfirm;
+            document.getElementById('confirmDialogOverlay').classList.remove('hidden');
+        }
+
+        function closeConfirmDialog() {
+            document.getElementById('confirmDialogOverlay').classList.add('hidden');
+            onConfirmAction = null;
+        }
+
+        function executeConfirm() {
+            if (onConfirmAction) {
+                onConfirmAction();
+            }
+            closeConfirmDialog();
+        }
+
+        function openReadAllConfirm() {
+            showConfirmDialog(
+                '確認讀取全部資料', 
+                '即將重新讀取 Google Sheet 上的所有歷史資料。若資料量較大可能會需要一點時間，確定要繼續嗎？',
+                () => {
+                    fetchGoogleSheetData('ALL');
+                },
+                false
+            );
+        }
+
         // --- GOOGLE SHEET FETCH LOGIC (Main Driver) ---
-        // Modified to support autoRefreshRange (string)
         async function fetchGoogleSheetData(autoRefreshRange = null) {
             const sheetId = document.getElementById('gsheetId').value.trim();
-            // In manual mode (autoRefreshRange is null), we use the picker. 
-            // In auto mode, we might process multiple dates.
             const pickerDate = document.getElementById('reportDatePicker').value;
             
             const btn = document.getElementById('btnFetchGSheet');
@@ -1057,7 +1087,6 @@
             }
             if (!autoRefreshRange && !pickerDate) return showToast('請選擇日期');
 
-            // --- Capture Config ---
             const cols = {
                 date: parseInt(document.getElementById('colDate').value) || 0,
                 group: parseInt(document.getElementById('colGroup').value) || 8,
@@ -1068,8 +1097,6 @@
                 hours:  parseInt(document.getElementById('colHours').value) || 6,
                 link:  parseInt(document.getElementById('colLink').value) || 7
             };
-            // Note: we don't update currentDailyData.config here immediately for DB save, 
-            // but we use these cols for parsing.
 
             // --- UI Busy State (Only for Manual) ---
             if (!autoRefreshRange) {
@@ -1122,7 +1149,7 @@
                 headerBtn.disabled = false;
                 btn.disabled = false;
                 headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
-                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取資料';
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料';
             }
 
             if (!successJson || !successJson.table) {
@@ -1132,7 +1159,6 @@
 
             const rows = successJson.table.rows;
             
-            // --- Helper: Parse Row ---
             const parseRow = (row) => {
                 const c = row.c;
                 if (!c) return null;
@@ -1142,8 +1168,6 @@
                 if (!name) return null;
 
                 const rawGroupName = String(getVal(cols.group)).trim();
-                
-                // --- MODIFIED: Store raw group name here, cleaning is done in renderData for flexibility ---
                 const groupName = rawGroupName; 
                 
                 let proj = String(getVal(cols.proj)).trim().replace(/【.*?】/g, '').trim();
@@ -1160,19 +1184,17 @@
 
             // --- MODE SELECTION ---
             if (autoRefreshRange) {
-                // === AUTO BATCH MODE ===
                 const db = getDB();
                 const today = new Date();
                 today.setHours(0,0,0,0);
                 
                 let cutoffTime = 0;
-                // Calculate cutoff
                 if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000); 
                 else if (autoRefreshRange === '7') cutoffTime = today.getTime() - (6 * 86400000);
                 else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
                 else if (autoRefreshRange === 'ALL') cutoffTime = 0;
 
-                const batchData = {}; // { "YYYY-MM-DD": [rows...] }
+                const batchData = {}; 
 
                 rows.forEach(row => {
                     const c = row.c; 
@@ -1181,22 +1203,12 @@
                     const rowDateStr = getVal(cols.date);
                     if (!rowDateStr) return;
 
-                    // Normalize Date Key
                     let keyDate = String(rowDateStr).trim();
-                    // Try parsing to ensure format YYYY-MM-DD standard, fallback to string if fails
-                    // This handles diverse formats like "2023/1/1" -> "2023-01-01"
                     const dObj = new Date(String(rowDateStr).replace(/\//g, '-'));
                     
-                    if (isNaN(dObj.getTime())) {
-                        // If not parseable, we can skip or use raw string if strict.
-                        // We will skip if we can't determine time for cutoff logic.
-                        return;
-                    }
-                    
-                    // Check Cutoff
+                    if (isNaN(dObj.getTime())) return;
                     if (autoRefreshRange !== 'ALL' && dObj.getTime() < cutoffTime) return;
 
-                    // Format key
                     keyDate = dObj.toISOString().split('T')[0];
 
                     const parsed = parseRow(row);
@@ -1206,7 +1218,6 @@
                     }
                 });
 
-                // Update DB for affected dates
                 let updateCount = 0;
                 Object.keys(batchData).forEach(k => {
                     db[k] = {
@@ -1218,22 +1229,17 @@
                 
                 saveDB(db);
                 
-                // Refresh UI if current date was affected, or just stay put
                 if (currentReportDate && db[currentReportDate]) {
-                    // 修正：加入 true 參數，表示這是背景刷新，不強制切換 Tab
                     loadReportByDate(currentReportDate, true);
                 } else {
-                    // Update list only
                     updateHistoryList();
-                    // 如果當前在趨勢分析，且有新資料進來(雖然不是當前選定日期)，也應該刷新趨勢圖
                     if (activeTab === 'ANALYSIS') renderTrendAnalysis();
                 }
                 
                 const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天';
-                const msg = `自動刷新完成 (範圍: ${rangeLabel}, 更新 ${updateCount} 天)`;
+                const msg = `刷新完成 (範圍: ${rangeLabel}, 更新 ${updateCount} 天)`;
                 
                 updateStatus(msg, 'success');
-                // 新增：跳出 Toast 通知
                 showToast(msg);
 
             } else {
@@ -1244,14 +1250,13 @@
                     if (!c) return;
                     const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
                     let rowDate = getVal(cols.date);
-                    // Standard loose check
                     if (!rowDate || !String(rowDate).includes(pickerDate)) return;
                     
                     const parsed = parseRow(row);
                     if(parsed) fetchedData.push(parsed);
                 });
 
-                currentDailyData.config = { sheetId, cols }; // Save config
+                currentDailyData.config = { sheetId, cols }; 
                 currentDailyData.rows = fetchedData;
                 updateStatus(`成功：已讀取 ${currentDailyData.rows.length} 筆資料`, 'success');
                 saveCurrentReport(); 
@@ -1266,12 +1271,10 @@
             }
         }
 
-        // --- RENDER LOGIC (Aggregator) ---
-
-        // HELPER: Clean Author Name (Rightmost 5 chars)
+        // --- RENDER LOGIC ---
         function cleanAuthorName(name) {
             if (!name) return 'Unknown';
-            return name.slice(-5); // Keep only last 5 characters
+            return name.slice(-5); 
         }
         
         function renderData() {
@@ -1286,7 +1289,6 @@
                 resultSection.classList.add('hidden');
                 emptyState.classList.remove('hidden');
                 document.getElementById('headerTotalManHours').innerText = "0 人 / 0.0hr";
-                // Clear buttons on empty state
                 document.getElementById('groupFilterButtons').innerHTML = '';
                 return;
             }
@@ -1295,30 +1297,25 @@
             resultSection.classList.remove('hidden');
             emptyState.classList.add('hidden');
 
-            // 0. Dynamic Filter Buttons Generation (Fix for Group Tag Mismatch)
-            // Extract unique groups from the actual data
             const uniqueGroups = Array.from(new Set(rawRows.map(r => cleanGroupName(r.group)))).sort();
             
-            // Safety check: if current active filter no longer exists in data, reset to ALL
             if (activeFilterGroup !== 'ALL' && !uniqueGroups.includes(activeFilterGroup)) {
                 activeFilterGroup = 'ALL';
             }
             
             renderDynamicFilterButtons(uniqueGroups);
 
-            // 1. Group by User (Grouping uses the CLEANED group name already stored in rows)
             const userMap = {};
             let totalHoursGlobal = 0;
 
             rawRows.forEach(row => {
-                // Ensure dynamic update of group name based on current settings
                 const dynamicGroup = cleanGroupName(row.group);
 
                 if (!userMap[row.name]) {
                     userMap[row.name] = { 
                         name: row.name, 
                         group: dynamicGroup || '其他', 
-                        originalGroup: row.group || '其他', // NEW: Store original for display
+                        originalGroup: row.group || '其他', 
                         totalHours: 0, 
                         tasks: [] 
                     };
@@ -1331,55 +1328,36 @@
 
             const userList = Object.values(userMap);
             
-            // --- APPLY FILTER ---
             let filteredUserList = userList;
             if (activeFilterGroup !== 'ALL') {
-                // Filter is applied against the already cleaned 'group' field in the user object
                 filteredUserList = userList.filter(u => u.group === activeFilterGroup);
             }
-            // --- END APPLY FILTER ---
 
-            const userCount = userList.length; // Global count remains based on all data.
+            const userCount = userList.length; 
 
-            // Update Header Stats (always use global total hours for header)
             const statsText = `${userCount}人 / ${totalHoursGlobal.toFixed(1)}hr`;
             document.getElementById('headerTotalManHours').innerText = statsText;
 
-            // Calculate filtered stats for the widget header (Adjustment 3)
             let filteredHours = 0;
             filteredUserList.forEach(u => filteredHours += u.totalHours);
             const filteredStatsText = `${filteredUserList.length}人 / ${filteredHours.toFixed(1)}hr`;
             document.getElementById('widgetTotalManHours').innerText = filteredStatsText;
 
-            // Sort for Detail View (Group > Original Group > Hours) to create small group concepts
-            // 修正：加入 originalGroup (副標) 作為第二排序條件，避免同組別內不同班別混雜
             filteredUserList.sort((a, b) => {
-                // Primary: Main Group (Cleaned)
                 if (a.group !== b.group) return a.group.localeCompare(b.group, 'zh-Hant');
-                
-                // Secondary: Original Group (Sub-group) - 確保如 "品檢_早班" 與 "品檢_中班" 會分開聚集
                 if (a.originalGroup !== b.originalGroup) return a.originalGroup.localeCompare(b.originalGroup, 'zh-Hant');
-                
-                // Tertiary: Hours Descending
                 return b.totalHours - a.totalHours;
             });
 
-            // 2. Render Detail View (NOW TOP) - Uses filtered list
             renderDetailList(filteredUserList);
-
-            // 3. Render Dashboard Widgets (NOW BOTTOM) - Uses filtered list
             renderDashboardWidgets(filteredUserList);
-
-            // 4. Render Project Pie Chart - Uses filtered list data
             renderProjectStats(filteredUserList);
         }
 
-        // NEW: Function to render filter buttons dynamically
         function renderDynamicFilterButtons(groups) {
             const container = document.getElementById('groupFilterButtons');
             if (!container) return;
 
-            // Always add 'ALL' button first
             let html = `
                 <button class="filter-btn ${activeFilterGroup === 'ALL' ? 'active' : ''}" 
                         data-group="ALL" 
@@ -1389,7 +1367,7 @@
             `;
 
             groups.forEach(group => {
-                if (!group) return; // skip empty
+                if (!group) return; 
                 const isActive = (activeFilterGroup === group);
                 html += `
                     <button class="filter-btn ${isActive ? 'active' : ''}" 
@@ -1403,12 +1381,10 @@
             container.innerHTML = html;
         }
 
-
         function renderDashboardWidgets(userList) {
             const container = document.getElementById('hoursGridContainer');
             container.innerHTML = '';
             
-            // Sort by hours desc
             const sorted = [...userList].sort((a,b) => b.totalHours - a.totalHours);
 
             let rows = '';
@@ -1420,12 +1396,8 @@
                 
                 let width = Math.min((u.totalHours / 12) * 100, 100);
                 
-                // Clean Name & Group
                 const shortName = cleanAuthorName(u.name);
                 const displayLabel = u.group ? `<span class="text-xs text-slate-400 mr-1">[${u.group}]</span>${shortName}` : shortName;
-
-                // Adjustments 1 & 2: Added onclick, title, cursor-pointer, and scrollToUser logic
-                // Pass name safely to scrollToUser (escape single quotes)
                 const safeName = u.name.replace(/'/g, "\\'");
 
                 rows += `
@@ -1441,7 +1413,6 @@
             container.innerHTML = rows;
         }
 
-        // --- MERGE LOGIC ---
         function handleMergeButtonClick() {
             const btn = document.getElementById('btnMergeAction');
             const span = btn.querySelector('span');
@@ -1450,16 +1421,13 @@
             const hint = document.getElementById('mergeHint');
 
             if (!isMergeMode) {
-                // Enter Merge Mode
                 isMergeMode = true;
                 span.innerText = "合併選取項目";
                 cancelBtn.classList.remove('hidden');
                 thCheckbox.classList.remove('hidden');
                 hint.classList.remove('hidden');
-                // Re-render to show checkboxes
                 renderData();
             } else {
-                // Execute Merge Action -> OPEN MODAL
                 openMergeDialog();
             }
         }
@@ -1479,7 +1447,6 @@
             renderData();
         }
 
-        // --- CUSTOM MODAL LOGIC (MERGE) ---
         function openMergeDialog() {
             const checkboxes = document.querySelectorAll('.proj-checkbox:checked');
             if (checkboxes.length < 2) {
@@ -1489,12 +1456,10 @@
             const selectedNames = Array.from(checkboxes).map(cb => cb.value);
             const defaultName = selectedNames[0];
 
-            // Populate Modal
             document.getElementById('mergeNameInput').value = defaultName;
             const listEl = document.getElementById('mergeListPreview');
             listEl.innerHTML = selectedNames.map(name => `<li>${name}</li>`).join('');
 
-            // Show Modal
             document.getElementById('mergeDialogOverlay').classList.remove('hidden');
             document.getElementById('mergeNameInput').focus();
         }
@@ -1513,24 +1478,19 @@
             const checkboxes = document.querySelectorAll('.proj-checkbox:checked');
             const selectedNames = Array.from(checkboxes).map(cb => cb.value);
 
-            // Resolve actual original names from selected aliases (in case user merges already merged groups)
             let actualOriginals = [];
             
             selectedNames.forEach(name => {
-                // Check if this 'name' is an alias for an existing rule
                 const existingRuleIndex = globalSettings.projectMerges.findIndex(r => r.alias === name);
                 
                 if (existingRuleIndex > -1) {
-                    // It's an existing merged group, grab its originals and remove the old rule
                     actualOriginals.push(...globalSettings.projectMerges[existingRuleIndex].originals);
                     globalSettings.projectMerges.splice(existingRuleIndex, 1);
                 } else {
-                    // It's a raw project name
                     actualOriginals.push(name);
                 }
             });
 
-            // Create new rule
             globalSettings.projectMerges.push({
                 alias: newName.trim(),
                 originals: actualOriginals
@@ -1539,15 +1499,13 @@
             saveGlobalSettings();
             
             closeMergeDialog();
-            cancelMergeMode(); // Exit merge mode and refresh
+            cancelMergeMode(); 
             showToast('合併成功！可至「控制台」管理規則');
         }
 
         function renderProjectStats(userList) {
-            // Check visibility
             const canvas = document.getElementById('projectPieChart');
             if (!canvas || canvas.offsetParent === null) {
-                // If hidden, destroy instance to prevent leaks/errors and return
                 if (projectChartInstance) {
                     projectChartInstance.destroy();
                     projectChartInstance = null;
@@ -1555,53 +1513,44 @@
                 return; 
             }
 
-            // Flatten tasks from all filtered users
             let allTasks = [];
             userList.forEach(u => allTasks.push(...u.tasks));
             
             if (allTasks.length === 0) {
                  document.getElementById('projectTableBody').innerHTML = '';
                  if (projectChartInstance) {
-                     projectChartInstance.destroy();
-                     projectChartInstance = null;
+                      projectChartInstance.destroy();
+                      projectChartInstance = null;
                  }
                  return;
             }
 
-            // Aggregate hours by project (Applying Merges)
             const counts = {};
             let total = 0;
 
             allTasks.forEach(t => {
                 let p = t.project || '未分類';
-                
-                // Check if this project name matches any original name in merge rules
                 const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(p));
                 if (mergeRule) {
-                    p = mergeRule.alias; // Use the alias
+                    p = mergeRule.alias; 
                 }
 
                 counts[p] = (counts[p] || 0) + t.hours;
                 total += t.hours;
             });
 
-            // Convert to array and sort by hours desc
             const dataArr = Object.keys(counts).map(k => ({
                 name: k,
                 hours: counts[k],
                 percent: (counts[k] / total * 100).toFixed(1)
             })).sort((a, b) => b.hours - a.hours);
 
-            // Render Table (With Conditional Checkboxes)
             const tbody = document.getElementById('projectTableBody');
-            
-            // Handle header visibility based on isMergeMode
             const thCheckbox = document.getElementById('thCheckbox');
             if (isMergeMode) thCheckbox.classList.remove('hidden');
             else thCheckbox.classList.add('hidden');
 
             tbody.innerHTML = dataArr.map((d, i) => {
-                // Safely escape quotes for value attribute
                 const safeName = d.name.replace(/"/g, '&quot;');
                 return `
                 <tr class="hover:bg-slate-50 border-b border-slate-100 last:border-0 group">
@@ -1617,12 +1566,11 @@
                 </tr>
             `}).join('');
 
-            // Render Chart using Chart.js
             const ctx = document.getElementById('projectPieChart').getContext('2d');
             
             if (projectChartInstance) {
                 projectChartInstance.destroy();
-                projectChartInstance = null; // Ensure null after destroy
+                projectChartInstance = null; 
             }
 
             projectChartInstance = new Chart(ctx, {
@@ -1659,13 +1607,11 @@
             });
         }
 
-        // Toggle all checkboxes
         function toggleAllProjectCheckboxes(source) {
             const checkboxes = document.querySelectorAll('.proj-checkbox');
             checkboxes.forEach(cb => cb.checked = source.checked);
         }
 
-        // --- GROUP RULE LOGIC ---
         function addGroupRule() {
             const aliasInput = document.getElementById('newGroupAlias');
             const sourceInput = document.getElementById('newGroupSources');
@@ -1687,7 +1633,6 @@
 
             saveGlobalSettings();
             
-            // Clear inputs
             aliasInput.value = '';
             sourceInput.value = '';
             showToast('來源規則已新增');
@@ -1696,10 +1641,19 @@
         function deleteGroupRule(index) {
             ruleToDeleteIndex = index;
             deleteType = 'group';
-            document.getElementById('confirmDialogOverlay').classList.remove('hidden');
+            showConfirmDialog(
+                '移除規則',
+                '確定要刪除此來源合併規則嗎？',
+                () => {
+                    globalSettings.groupMerges.splice(index, 1);
+                    saveGlobalSettings();
+                    renderSettingsTab();
+                    showToast('已刪除規則');
+                },
+                true
+            );
         }
 
-        // --- EDIT GROUP RULE LOGIC (New) ---
         function openEditGroupRule(index) {
             ruleToEditGroupIndex = index;
             const rule = globalSettings.groupMerges[index];
@@ -1736,7 +1690,6 @@
             const newSources = newSourcesRaw.split(/[,\s，]+/).filter(s => s.trim() !== '');
             if (newSources.length === 0) return alert('請輸入至少一個原始名稱');
 
-            // Update
             globalSettings.groupMerges[ruleToEditGroupIndex] = {
                 alias: newAlias,
                 originals: newSources
@@ -1751,16 +1704,24 @@
         function deleteProjectRule(index) {
             ruleToDeleteIndex = index;
             deleteType = 'project';
-            document.getElementById('confirmDialogOverlay').classList.remove('hidden');
+            showConfirmDialog(
+                '移除規則',
+                '確定要刪除此專案合併規則嗎？',
+                () => {
+                    globalSettings.projectMerges.splice(index, 1);
+                    saveGlobalSettings();
+                    renderSettingsTab();
+                    showToast('已刪除規則');
+                },
+                true
+            );
         }
 
-        // --- EDIT PROJECT RULE LOGIC (New) ---
         function openEditProjectRule(index) {
             ruleToEditIndex = index;
             const rule = globalSettings.projectMerges[index];
             if (!rule) return;
 
-            // Pre-fill input
             const input = document.getElementById('editAliasInput');
             input.value = rule.alias;
             
@@ -1783,41 +1744,20 @@
                 return alert('請輸入名稱');
             }
 
-            // Update
             globalSettings.projectMerges[ruleToEditIndex].alias = newAlias;
             saveGlobalSettings();
             
-            // Refresh
             closeEditDialog();
-            renderData(); // Make sure pie chart updates immediately if on overview
+            renderData(); 
             showToast('名稱已更新');
         }
 
+        // Renamed/Refactored legacy function to use new confirm flow inside delete buttons above, but kept structure if needed
         function executeDeleteRule() {
-            if (ruleToDeleteIndex === -1) return;
-            
-            if (deleteType === 'project') {
-                globalSettings.projectMerges.splice(ruleToDeleteIndex, 1);
-            } else if (deleteType === 'group') {
-                globalSettings.groupMerges.splice(ruleToDeleteIndex, 1);
-            }
-            
-            saveGlobalSettings();
-            
-            renderData();
-            
-            closeConfirmDialog();
-            showToast('已刪除規則');
-        }
-
-        function closeConfirmDialog() {
-            document.getElementById('confirmDialogOverlay').classList.add('hidden');
-            ruleToDeleteIndex = -1;
-            deleteType = '';
+            // This is now handled by the callback in showConfirmDialog
         }
 
         function renderSettingsTab() {
-            // Render Project Rules (Updated with Edit Button)
             const projContainer = document.getElementById('mergeRulesContainer');
             const noProjMsg = document.getElementById('noRulesMsg');
             
@@ -1849,7 +1789,6 @@
                 `).join('');
             }
 
-            // Render Group Rules
             const groupContainer = document.getElementById('groupRulesContainer');
             groupContainer.innerHTML = globalSettings.groupMerges.map((rule, index) => `
                 <div class="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
@@ -1894,14 +1833,11 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
                 
-                // Add ID for anchor scroll (Adjustment 2)
                 card.id = getUserId(u.name);
 
-                // Clean Name & Group for Card Header
                 const shortName = cleanAuthorName(u.name);
                 
                 let tasksHtml = u.tasks.map(t => {
-                    // Logic for Link Button
                     let linkHtml = '';
                     if (t.link && t.link.startsWith('http')) {
                          linkHtml = `
@@ -1955,13 +1891,11 @@
             const buttons = card.querySelectorAll('.accordion-btn');
             const contents = card.querySelectorAll('.accordion-content');
             
-            // 檢查是否全部都已經展開 (若全部展開，則動作為收合；若有任一未展開，則動作為全展開)
             const allExpanded = Array.from(buttons).every(btn => btn.getAttribute('aria-expanded') === 'true');
             const newState = !allExpanded;
 
             buttons.forEach(btn => {
                 btn.setAttribute('aria-expanded', newState);
-                // 同步旋轉箭頭 icon
                 const icon = btn.querySelector('.accordion-icon');
                 if (icon) {
                     if (newState) icon.style.transform = 'rotate(180deg)';
@@ -1980,7 +1914,6 @@
 
         function formatContent(text) {
              if (!text) return '(無內容)';
-             // Simple highlight logic
              return text.replace(/(測試內容|工作事項|問題回報)/g, '<span class="font-bold text-slate-800">$1</span>');
         }
 
@@ -1999,9 +1932,8 @@
         // --- TREND ANALYSIS LOGIC (NEW) ---
         function setAnalysisMode(mode) {
             analysisMode = mode;
-            activeTrendFilter = null; // Reset filter on mode change
+            activeTrendFilter = null; 
             
-            // UI Switch Logic
             const btnProject = document.getElementById('btnModeProject');
             const btnPerson = document.getElementById('btnModePerson');
             const btnGroup = document.getElementById('btnModeGroup');
@@ -2021,12 +1953,10 @@
             activeBtn.classList.remove(...inactiveClass);
             activeBtn.classList.add(...activeClass);
 
-            // Toggle visibility of Entity Selection Area & Reset Buttons
             const entityArea = document.getElementById('entitySelectionArea');
             const chartHint = document.getElementById('chartLegendHint');
             const title = document.getElementById('entitySelectionTitle');
             
-            // Hide all resets first - Visibility now managed inside renderTrendAnalysis based on selection state
             btnResetPerson.classList.add('hidden');
             btnResetProject.classList.add('hidden');
 
@@ -2045,7 +1975,6 @@
                 chartHint.classList.remove('hidden');
             }
 
-            // Initialization for modes
             if (mode === 'PERSON') {
                 selectedPersons.clear();
             } else if (mode === 'PROJECT') {
@@ -2060,7 +1989,6 @@
             renderTrendAnalysis();
         }
 
-        // Reset functions
         function resetPersonSelection() {
             shouldSelectAllPersons = true;
             selectedPersons.clear();
@@ -2073,9 +2001,11 @@
             renderTrendAnalysis();
         }
 
-        // Generic toggle for Projects
         function toggleProjectSelection(name) {
             if (analysisMode === 'PROJECT') {
+                // FIXED: Set flag to false on manual toggle to respect user selection
+                shouldSelectAllProjects = false;
+                
                 const isAllSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
                 
                 if (isAllSelected) {
@@ -2096,9 +2026,11 @@
             }
         }
 
-        // Generic toggle for Persons
         function togglePersonSelection(name) {
             if (analysisMode === 'PERSON') {
+                // FIXED: Set flag to false on manual toggle
+                shouldSelectAllPersons = false; 
+                
                 const isAllSelected = (selectedPersons.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
                 
                 if (isAllSelected) {
@@ -2120,7 +2052,6 @@
         }
 
         function renderTrendAnalysis() {
-            // UI Filter Hint (Only for GROUP mode now)
             const hintBox = document.getElementById('trendFilterHint');
             const hintText = document.getElementById('trendFilterText');
             
@@ -2131,38 +2062,67 @@
                 hintBox.classList.add('hidden');
             }
 
-            // Get DB history
             const db = getDB();
             const daysToAnalyze = parseInt(document.getElementById('analysisDays').value) || 7;
             
-            // Get Dates
+            // --- NEW: MONTHLY AGGREGATION LOGIC (Point 2) ---
+            const isMonthlyMode = daysToAnalyze > 30; // Threshold for switching to monthly view
+            
             const today = new Date();
-            const dates = [];
-            for(let i=daysToAnalyze-1; i>=0; i--) {
-                const d = new Date();
-                d.setDate(today.getDate() - i);
-                dates.push(d.toISOString().split('T')[0]);
+            const labels = []; // X-axis labels (Dates or Months)
+            
+            if (isMonthlyMode) {
+                // Generate last N months labels (YYYY-MM)
+                // daysToAnalyze = 90 -> approx 3 months, 180 -> 6, 365 -> 12
+                const monthsCount = Math.round(daysToAnalyze / 30);
+                for(let i=monthsCount-1; i>=0; i--) {
+                    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    labels.push(`${year}-${month}`);
+                }
+            } else {
+                // Generate daily labels
+                for(let i=daysToAnalyze-1; i>=0; i--) {
+                    const d = new Date();
+                    d.setDate(today.getDate() - i);
+                    labels.push(d.toISOString().split('T')[0]);
+                }
             }
 
-            // Aggregate Data
-            const aggregated = {};
+            const aggregated = {}; // { Label: { Entity: Hours } }
             const allEntities = new Set(); 
             const entityTotals = {}; 
-            const personGroups = {}; // Helper for person grouping
-            
-            // NEW: Track unique authors per row (date) to calculate averages for GROUP mode
-            const rowStats = {}; // { date: { totalHours: 0, uniqueAuthors: Set() } }
+            const personGroups = {}; 
+            const rowStats = {}; // For Avg calculation
 
-            dates.forEach(date => {
-                aggregated[date] = {};
+            // Initialize aggregation buckets
+            labels.forEach(lbl => {
+                aggregated[lbl] = {};
+                rowStats[lbl] = { totalHours: 0, uniqueAuthors: new Set() };
+            });
+
+            // Iterate over all DB data keys (YYYY-MM-DD)
+            Object.keys(db).forEach(dateKey => {
+                if (!db[dateKey] || !db[dateKey].rows) return;
                 
-                // Initialize row stats for this date
-                if (!rowStats[date]) {
-                    rowStats[date] = { totalHours: 0, uniqueAuthors: new Set() };
+                let targetLabel = null;
+                
+                if (isMonthlyMode) {
+                    // Check if this date belongs to one of our target months
+                    const dKeyMonth = dateKey.substring(0, 7); // "YYYY-MM"
+                    if (labels.includes(dKeyMonth)) {
+                        targetLabel = dKeyMonth;
+                    }
+                } else {
+                    // Exact match for daily mode
+                    if (labels.includes(dateKey)) {
+                        targetLabel = dateKey;
+                    }
                 }
 
-                if (db[date] && db[date].rows) {
-                    db[date].rows.forEach(row => {
+                if (targetLabel) {
+                    db[dateKey].rows.forEach(row => {
                         let key = '';
                         let isRelevantForGroupStats = false;
 
@@ -2175,23 +2135,22 @@
                             personGroups[key] = cleanGroupName(row.group); 
                         } else if (analysisMode === 'GROUP') {
                             key = cleanGroupName(row.group);
-                            
-                            // Check relevance for Group Stats (Average calculation)
-                            // If no filter, all rows count. If filter active, only matching rows count.
                             if (!activeTrendFilter || key === activeTrendFilter) {
                                 isRelevantForGroupStats = true;
                             }
                         }
                         
                         const val = row.hours;
-                        aggregated[date][key] = (aggregated[date][key] || 0) + val;
+                        
+                        // Accumulate
+                        aggregated[targetLabel][key] = (aggregated[targetLabel][key] || 0) + val;
+                        
                         allEntities.add(key);
                         entityTotals[key] = (entityTotals[key] || 0) + val;
 
-                        // Accumulate stats for Group View Average Column
                         if (analysisMode === 'GROUP' && isRelevantForGroupStats) {
-                            rowStats[date].totalHours += val;
-                            rowStats[date].uniqueAuthors.add(row.name);
+                            rowStats[targetLabel].totalHours += val;
+                            rowStats[targetLabel].uniqueAuthors.add(row.name);
                         }
                     });
                 }
@@ -2201,40 +2160,33 @@
             currentTotalEntitiesCount = entitiesArr.length;
             entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
 
-            // --- COMPARISON MODE LOGIC (PERSON & PROJECT) ---
             if (analysisMode === 'PERSON' || analysisMode === 'PROJECT') {
                 const isProjectMode = (analysisMode === 'PROJECT');
                 const selectedSet = isProjectMode ? selectedProjects : selectedPersons;
                 const shouldSelectAll = isProjectMode ? shouldSelectAllProjects : shouldSelectAllPersons;
                 const btnReset = isProjectMode ? document.getElementById('btnResetProject') : document.getElementById('btnResetPerson');
 
-                // Handle Select All Flag
+                // FIXED: Don't disable flag here. Rely on toggle function to disable it.
+                // This ensures "All" selection persists across date range changes.
                 if (shouldSelectAll && entitiesArr.length > 0) {
                     entitiesArr.forEach(p => selectedSet.add(p));
-                    if (isProjectMode) shouldSelectAllProjects = false;
-                    else shouldSelectAllPersons = false;
                 }
 
-                // Check if currently "All Selected" to toggle Reset Button visibility
-                // Logic: If selection size < total count => Show Button. Else (Full selection) => Hide Button.
-                // Note: We also check > 0 to avoid showing it when there is no data at all.
                 if (selectedSet.size < currentTotalEntitiesCount && selectedSet.size > 0) {
                     btnReset.classList.remove('hidden');
                 } else {
                     btnReset.classList.add('hidden');
                 }
 
-                // Render Selection UI
                 const unselectedContainer = document.getElementById('unselectedEntityContainer');
                 unselectedContainer.innerHTML = '';
 
-                // Group unselected entities
                 const unselectedByGroup = {};
                 entitiesArr.forEach(p => {
                     if (!selectedSet.has(p)) {
                         let grp = '其他';
                         if (isProjectMode) {
-                            grp = '專案清單'; // Projects just go into one list
+                            grp = '專案清單'; 
                         } else {
                             grp = personGroups[p] || '其他';
                         }
@@ -2273,18 +2225,15 @@
                     });
                 }
 
-                // Filter Chart Entities to only selected
                 entitiesArr = Array.from(selectedSet);
                 entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
             } 
-            // --- GROUP MODE LOGIC ---
             else {
                 if (activeTrendFilter) {
                     entitiesArr = entitiesArr.filter(e => e === activeTrendFilter);
                 }
             }
             
-            // Prepare Chart DataSets
             let isStacked = false;
             if (analysisMode === 'GROUP') {
                 isStacked = true;
@@ -2296,13 +2245,12 @@
             const datasets = entitiesArr.map((entity, i) => {
                 return {
                     label: entity,
-                    data: dates.map(date => aggregated[date][entity] || 0),
+                    data: labels.map(lbl => aggregated[lbl][entity] || 0), // Use labels array
                     backgroundColor: getColor(i),
                     stack: isStacked ? 'Stack 0' : undefined, 
                 };
             });
 
-            // Render Chart
             const ctxEl = document.getElementById('trendChart');
             if (!ctxEl) return;
             const ctx = ctxEl.getContext('2d');
@@ -2315,7 +2263,7 @@
             trendChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: dates,
+                    labels: labels,
                     datasets: datasets
                 },
                 options: {
@@ -2331,11 +2279,10 @@
                             } else if (analysisMode === 'PROJECT') {
                                 toggleProjectSelection(label);
                             } else {
-                                // Group Mode Drill Down
                                 if (activeTrendFilter === label) {
-                                    activeTrendFilter = null;
+                                     activeTrendFilter = null;
                                 } else {
-                                    activeTrendFilter = label;
+                                     activeTrendFilter = label;
                                 }
                                 setTimeout(() => renderTrendAnalysis(), 0);
                             }
@@ -2343,7 +2290,8 @@
                     },
                     scales: {
                         x: { 
-                            stacked: isStacked 
+                            stacked: isStacked,
+                            title: { display: isMonthlyMode, text: isMonthlyMode ? '月份' : '日期' }
                         },
                         y: { 
                             stacked: isStacked, 
@@ -2379,25 +2327,24 @@
                 }
             });
 
-            renderTrendTable(dates, entitiesArr, aggregated, rowStats);
+            renderTrendTable(labels, entitiesArr, aggregated, rowStats, isMonthlyMode);
         }
 
-        function renderTrendTable(dates, entities, dataMap, rowStats) {
+        function renderTrendTable(labels, entities, dataMap, rowStats, isMonthlyMode) {
             const table = document.getElementById('trendTable');
             
             const totals = {};
             entities.forEach(e => {
-                totals[e] = dates.reduce((sum, date) => sum + (dataMap[date][e] || 0), 0);
+                totals[e] = labels.reduce((sum, lbl) => sum + (dataMap[lbl][e] || 0), 0);
             });
             const sortedEntities = entities.sort((a,b) => totals[b] - totals[a]);
 
-            // Determine if we show the Avg column
             const showAvg = (analysisMode === 'GROUP');
 
             let html = `
                 <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th class="px-2 py-2 font-bold text-slate-500">日期</th>
+                        <th class="px-2 py-2 font-bold text-slate-500">${isMonthlyMode ? '月份' : '日期'}</th>
                         ${sortedEntities.map(e => `<th class="px-2 py-2 text-center text-slate-700 whitespace-nowrap">${e}</th>`).join('')}
                         <th class="px-2 py-2 text-right font-bold text-slate-700">總計</th>
                         ${showAvg ? '<th class="px-2 py-2 text-right font-bold text-indigo-600 bg-indigo-50/30">平均/人</th>' : ''}
@@ -2406,31 +2353,29 @@
                 <tbody>
             `;
 
-            const reversedDates = [...dates].reverse();
+            const reversedLabels = [...labels].reverse();
             
-            reversedDates.forEach(date => {
+            reversedLabels.forEach(lbl => {
                 let rowTotal = 0;
                 const cells = sortedEntities.map(e => {
-                    const val = dataMap[date][e] || 0;
+                    const val = dataMap[lbl][e] || 0;
                     rowTotal += val;
                     return `<td class="px-2 py-2 text-center border-b border-slate-50 ${val===0 ? 'text-slate-200' : 'text-slate-600 font-mono'}">${val > 0 ? val.toFixed(1) : '-'}</td>`;
                 });
 
-                // Calculate Avg for Group View
                 let avgCell = '';
                 if (showAvg) {
-                    const stats = rowStats[date] || { totalHours: 0, uniqueAuthors: new Set() };
+                    const stats = rowStats[lbl] || { totalHours: 0, uniqueAuthors: new Set() };
                     const count = stats.uniqueAuthors.size;
                     const total = stats.totalHours;
                     const avg = count > 0 ? (total / count).toFixed(1) : '-';
-                    // Optional tooltip to show calculation details
                     const title = count > 0 ? `共 ${count} 人 (${total.toFixed(1)}hr)` : '';
                     avgCell = `<td class="px-2 py-2 text-right font-bold font-mono text-indigo-600 border-b border-slate-50 bg-indigo-50/30" title="${title}">${avg}</td>`;
                 }
 
                 html += `
                     <tr class="hover:bg-slate-50 transition">
-                        <td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${date}</td>
+                        <td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${lbl}</td>
                         ${cells.join('')}
                         <td class="px-2 py-2 text-right font-bold text-slate-800 border-b border-slate-50 bg-slate-50/50">${rowTotal.toFixed(1)}</td>
                         ${avgCell}
@@ -2442,11 +2387,11 @@
             table.innerHTML = html;
         }
 
-        // --- HISTORY & DATA MANAGER ---
-        // 修正：增加 preventTabSwitch 參數 (預設 false 維持原有手動點擊的行為)
+        // Added missing Date/History functions
         function loadReportByDate(date, preventTabSwitch = false) {
             currentReportDate = date;
-            document.getElementById('reportDatePicker').value = date;
+            const picker = document.getElementById('reportDatePicker');
+            if(picker) picker.value = date;
             updateHistoryList();
 
             const db = getDB();
@@ -2462,29 +2407,21 @@
                 }
             }
             
-            // 邏輯分流
             if (preventTabSwitch) {
-                // 背景刷新模式：不切換 Tab，但若當前視圖需要資料，則原地刷新
                 if (activeTab === 'OVERVIEW') {
                     renderData();
                 } else if (activeTab === 'ANALYSIS') {
                     renderTrendAnalysis();
                 }
             } else {
-                // 手動模式 (或初次載入)：Auto switch to overview if data exists, else source
                 if (currentDailyData.rows.length > 0) switchTab('OVERVIEW');
                 else switchTab('SOURCE');
             }
         }
 
-        // Renamed function and updated logic to switch to previous day
         function switchToPreviousDay() {
             const currentDate = currentReportDate;
-            
-            // Create a Date object from the current report date. Using 'T00:00:00' for timezone safety.
             const dateObj = new Date(currentDate + 'T00:00:00');
-            
-            // Subtract one day (JS handles month/year rollover automatically)
             dateObj.setDate(dateObj.getDate() - 1); 
             
             const year = dateObj.getFullYear();
@@ -2542,48 +2479,6 @@
             });
         }
 
-        function clearAllData() {
-            if (window.confirm('警告：確定要清空所有歷史紀錄嗎？')) {
-                localStorage.removeItem(DB_KEY);
-                const today = new Date().toISOString().split('T')[0];
-                loadReportByDate(today);
-                showToast('所有資料已清空');
-            }
-        }
-
-        function exportData() {
-            const db = getDB();
-            if (Object.keys(db).length === 0) return showToast('無資料可備份');
-            const dataStr = JSON.stringify(db, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `daily_report_v6_public_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        function importData(input) {
-            const file = input.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    saveDB(data);
-                    loadReportByDate(currentReportDate);
-                    showToast('資料還原成功');
-                } catch (error) {
-                    showToast('檔案格式錯誤');
-                }
-                input.value = '';
-            };
-            reader.readAsText(file);
-        }
-
-        // --- Settings Import/Export Logic ---
         function exportSettings() {
             if (!globalSettings) return showToast('無設定可匯出');
             const dataStr = JSON.stringify(globalSettings, null, 2);
@@ -2605,14 +2500,12 @@
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    // Simple validation to ensure it's a settings file
                     if (data.projectMerges || data.groupMerges) {
-                        // Merge imported settings into globalSettings
                         if (data.projectMerges) globalSettings.projectMerges = data.projectMerges;
                         if (data.groupMerges) globalSettings.groupMerges = data.groupMerges;
                         
-                        saveGlobalSettings(); // Saves to LS and refreshes Settings tab
-                        renderData(); // Refresh overview in case rules affected current view
+                        saveGlobalSettings(); 
+                        renderData(); 
                         showToast('設定匯入成功');
                     } else {
                         showToast('無效的設定檔格式');
