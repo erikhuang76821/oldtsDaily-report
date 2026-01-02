@@ -1274,7 +1274,12 @@
         // --- RENDER LOGIC ---
         function cleanAuthorName(name) {
             if (!name) return 'Unknown';
-            return name.slice(-5); 
+            
+            // 1. 先取後五碼 (兼容舊規則，處理過長的前綴)
+            let shortName = name.slice(-5);
+            
+            // 2. 再去除開頭的英文字母 (針對 S網頁陳葳 這類情況)
+            return shortName.replace(/^[a-zA-Z]+/, '');
         }
         
         function renderData() {
@@ -1397,7 +1402,8 @@
                 let width = Math.min((u.totalHours / 12) * 100, 100);
                 
                 const shortName = cleanAuthorName(u.name);
-                const displayLabel = u.group ? `<span class="text-xs text-slate-400 mr-1">[${u.group}]</span>${shortName}` : shortName;
+                // 修改：取消顯示副組名，以確保名字能完整顯示
+                const displayLabel = shortName;
                 const safeName = u.name.replace(/'/g, "\\'");
 
                 rows += `
