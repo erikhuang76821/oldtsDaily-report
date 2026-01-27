@@ -477,10 +477,16 @@
                             </div>
                         </div>
 
-                        <!-- Right side: Scroll button (Point 3) -->
-                        <button onclick="scrollToAnalysis()" class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap shrink-0 transform hover:-translate-y-0.5">
-                            <i class="fa-solid fa-chart-column mr-1"></i> 工時統計
-                        </button>
+                        <!-- Right side: Actions -->
+                        <div class="flex items-center gap-2 shrink-0">
+                            <!-- New Button for QA Project (Visible only in '品檢' filter) -->
+                            <a href="https://erikhuang76821.github.io/QA_project/" target="_blank" id="btnQaLink" class="hidden text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap transform hover:-translate-y-0.5 items-center gap-2 decoration-0">
+                                <i class="fa-solid fa-briefcase"></i> 案件管理
+                            </a>
+                            <button onclick="scrollToAnalysis()" class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap transform hover:-translate-y-0.5">
+                                <i class="fa-solid fa-chart-column mr-1"></i> 工時統計
+                            </button>
+                        </div>
                     </div>
                     <div id="detailView" class="space-y-2"></div>
                 </div>
@@ -1310,6 +1316,18 @@
             
             renderDynamicFilterButtons(uniqueGroups);
 
+            // New: Toggle QA Link Button
+            const btnQa = document.getElementById('btnQaLink');
+            if (btnQa) {
+                if (activeFilterGroup === '品檢') {
+                    btnQa.classList.remove('hidden');
+                    btnQa.classList.add('flex');
+                } else {
+                    btnQa.classList.add('hidden');
+                    btnQa.classList.remove('flex');
+                }
+            }
+
             const userMap = {};
             let totalHoursGlobal = 0;
 
@@ -1477,7 +1495,7 @@
         function confirmMerge() {
             const newName = document.getElementById('mergeNameInput').value;
             if (!newName || !newName.trim()) {
-                alert('請輸入合併後的名稱');
+                showToast('請輸入合併後的名稱');
                 return;
             }
 
@@ -1690,11 +1708,11 @@
             const newSourcesRaw = sourcesInput.value.trim();
 
             if (!newAlias || !newSourcesRaw) {
-                return alert('請填寫完整資訊');
+                return showToast('請填寫完整資訊');
             }
 
             const newSources = newSourcesRaw.split(/[,\s，]+/).filter(s => s.trim() !== '');
-            if (newSources.length === 0) return alert('請輸入至少一個原始名稱');
+            if (newSources.length === 0) return showToast('請輸入至少一個原始名稱');
 
             globalSettings.groupMerges[ruleToEditGroupIndex] = {
                 alias: newAlias,
@@ -1747,7 +1765,7 @@
             const newAlias = input.value.trim();
             
             if (!newAlias) {
-                return alert('請輸入名稱');
+                return showToast('請輸入名稱');
             }
 
             globalSettings.projectMerges[ruleToEditIndex].alias = newAlias;
