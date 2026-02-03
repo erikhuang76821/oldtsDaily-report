@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>團隊日報管理系統 (GS版)</title>
+    <title>團隊日報管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Chart.js for Pie Chart -->
@@ -191,7 +191,7 @@
                             <div>
                                 <label class="block text-sm font-bold text-slate-600 mb-1">Google Sheet ID (試算表 ID)</label>
                                 <div class="flex gap-2">
-                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入 ID 例如: 168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo">
+                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入 ID 例如: -">
                                 </div>
                             </div>
                         </div>
@@ -673,6 +673,17 @@
     </button>
 
     <script>
+        // --- HELPER FUNCTION ---
+        // Function to convert column index to letter (0->A, 1->B, etc.)
+        function getColLetter(index) {
+            let letter = '';
+            while (index >= 0) {
+                letter = String.fromCharCode((index % 26) + 65) + letter;
+                index = Math.floor(index / 26) - 1;
+            }
+            return letter;
+        }
+
         // --- STORAGE & STATE MANAGER ---
         const DB_KEY = 'daily_reports_db_v6_gs_clean'; 
         const SETTINGS_KEY = 'daily_reports_settings_v1';
@@ -703,7 +714,7 @@
         // Data Model
         let currentDailyData = {
             config: {
-                sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
+                sheetId: '',
                 cols: { date: 0, group: 8, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
             },
             rows: []
@@ -921,8 +932,42 @@
         }
 
         function saveDB(data) {
-            localStorage.setItem(DB_KEY, JSON.stringify(data));
-            updateHistoryList();
+            try {
+                localStorage.setItem(DB_KEY, JSON.stringify(data));
+                updateHistoryList();
+                return true; // Success
+            } catch (e) {
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    // Strategy: Prune oldest data
+                    // Get all keys (dates)
+                    const keys = Object.keys(data).sort(); // Ascending: Oldest first
+                    
+                    // Logic to remove a chunk to avoid too many retries
+                    // Try removing 1 item or 10%? Let's remove 1 for safety, or maybe 5 to reduce thrashing.
+                    if (keys.length > 0) {
+                        const keyToRemove = keys[0];
+                        delete data[keyToRemove]; // Remove from memory object
+                        
+                        console.warn(`LocalStorage Limit Reached. Pruning oldest record: ${keyToRemove}`);
+                        
+                        // Notify user only once or throttle? 
+                        // Since this function is recursive, we might spam toasts.
+                        // Let's rely on the final state or check a global flag?
+                        // For simplicity, update the status message area instead of Toast if possible, or just a generic Toast.
+                        
+                        // Retry saving
+                        return saveDB(data);
+                    } else {
+                        // DB is empty but still cant save? (Metadata too huge? Impossible usually)
+                        showToast('儲存空間已滿且無法釋放更多空間。');
+                        return false;
+                    }
+                } else {
+                    console.error('Storage Error', e);
+                    showToast('儲存時發生錯誤');
+                    return false;
+                }
+            }
         }
 
         // --- TAB LOGIC ---
@@ -966,16 +1011,18 @@
                     renderTrendAnalysis();
                 } else if (tab === 'SOURCE') {
                     sourceSec.classList.remove('hidden');
-                    // Update config inputs...
-                    document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
-                    document.getElementById('colDate').value = currentDailyData.config.cols.date;
-                    document.getElementById('colGroup').value = currentDailyData.config.cols.group;
-                    document.getElementById('colName').value = currentDailyData.config.cols.name;
-                    document.getElementById('colProj').value = currentDailyData.config.cols.proj;
-                    document.getElementById('colId').value = currentDailyData.config.cols.id;
-                    document.getElementById('colContent').value = currentDailyData.config.cols.content;
-                    document.getElementById('colHours').value = currentDailyData.config.cols.hours;
-                    document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
+                    // Only update inputs if config exists in loaded data
+                    if (currentDailyData.config && currentDailyData.config.sheetId) {
+                         document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
+                         document.getElementById('colDate').value = currentDailyData.config.cols.date;
+                         document.getElementById('colGroup').value = currentDailyData.config.cols.group;
+                         document.getElementById('colName').value = currentDailyData.config.cols.name;
+                         document.getElementById('colProj').value = currentDailyData.config.cols.proj;
+                         document.getElementById('colId').value = currentDailyData.config.cols.id;
+                         document.getElementById('colContent').value = currentDailyData.config.cols.content;
+                         document.getElementById('colHours').value = currentDailyData.config.cols.hours;
+                         document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
+                    }
                     updateRawPreview();
                 } else if (tab === 'SETTINGS') {
                     settingsSec.classList.remove('hidden');
@@ -1070,14 +1117,14 @@
                 '確認讀取全部資料', 
                 '即將重新讀取 Google Sheet 上的所有歷史資料。若資料量較大可能會需要一點時間，確定要繼續嗎？',
                 () => {
-                    fetchGoogleSheetData('ALL');
+                    fetchGoogleSheetData('ALL', true); // Modified: Enable batch write for interactive Read All
                 },
                 false
             );
         }
 
         // --- GOOGLE SHEET FETCH LOGIC (Main Driver) ---
-        async function fetchGoogleSheetData(autoRefreshRange = null) {
+        async function fetchGoogleSheetData(autoRefreshRange = null, isInteractiveReadAll = false) {
             const sheetId = document.getElementById('gsheetId').value.trim();
             const pickerDate = document.getElementById('reportDatePicker').value;
             
@@ -1118,53 +1165,40 @@
                 statusMsg.innerHTML = msg;
             };
 
-            const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+            // Config for Batching
+            const BATCH_SIZE = 500;
+            let offset = 0;
+            let hasMore = true;
+            let totalFetched = 0;
+            const seenDates = new Set();
+            const db = getDB(); // Load existing DB to merge
+            
+            const dateColIndex = parseInt(document.getElementById('colDate').value) || 0;
+            const dateColLetter = getColLetter(dateColIndex);
+
+            // Determine Cutoff Time for Optimization
+            let cutoffTime = 0;
+            let manualTargetDateStr = null; // For manual mode only
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000); 
+            else if (autoRefreshRange === '7') cutoffTime = today.getTime() - (6 * 86400000);
+            else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
+            else if (autoRefreshRange === 'ALL') cutoffTime = 0;
+            else if (!autoRefreshRange && pickerDate) {
+                // Manual Mode: Setup strict date target
+                manualTargetDateStr = pickerDate.trim(); // YYYY-MM-DD
+            }
+
             const strategies = [
-                { url: gvizUrl, name: 'Direct' },
-                { url: `https://corsproxy.io/?${encodeURIComponent(gvizUrl)}`, name: 'CorsProxy' },
-                { url: `https://api.allorigins.win/get?url=${encodeURIComponent(gvizUrl)}`, name: 'AllOrigins', wrapper: true }
+                { url: (tq) => `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${tq}`, name: 'Direct' },
+                { url: (tq) => `https://corsproxy.io/?${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${tq}`)}`, name: 'CorsProxy' },
+                { url: (tq) => `https://api.allorigins.win/get?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${tq}`)}`, name: 'AllOrigins', wrapper: true }
             ];
 
-            let successJson = null;
-
-            for (const strat of strategies) {
-                try {
-                    const res = await fetch(strat.url);
-                    if (!res.ok) throw new Error('Network Error');
-                    let text = await res.text();
-                    
-                    if (strat.wrapper) {
-                        const data = JSON.parse(text);
-                        text = data.contents;
-                    }
-
-                    const start = text.indexOf('{');
-                    const end = text.lastIndexOf('}') + 1;
-                    if (start > -1 && end > -1) {
-                        successJson = JSON.parse(text.substring(start, end));
-                        break; 
-                    }
-                } catch(e) {
-                    console.warn(`GSheet Strat ${strat.name} failed`, e);
-                }
-            }
-            
-            // Reset UI (Manual)
-            if (!autoRefreshRange) {
-                const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
-                headerBtn.disabled = false;
-                btn.disabled = false;
-                headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
-                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料';
-            }
-
-            if (!successJson || !successJson.table) {
-                updateStatus('讀取失敗：無法存取試算表。請確認 ID 正確且權限已設為「知道連結者皆可檢視」。', 'error');
-                return;
-            }
-
-            const rows = successJson.table.rows;
-            
+            // Helper to parse row
             const parseRow = (row) => {
                 const c = row.c;
                 if (!c) return null;
@@ -1188,93 +1222,209 @@
                 };
             };
 
-            // --- MODE SELECTION ---
-            if (autoRefreshRange) {
-                const db = getDB();
-                const today = new Date();
-                today.setHours(0,0,0,0);
+            // Loop for Batching
+            while (hasMore) {
+                // Construct Query: Order by Date DESC to get newest first
+                const tqParam = encodeURIComponent(`select * order by ${dateColLetter} desc limit ${BATCH_SIZE} offset ${offset}`);
+                let successJson = null;
+                let fetchSuccess = false;
+
+                // Try Strategies
+                for (const strat of strategies) {
+                    try {
+                        const fetchUrl = strat.url(tqParam);
+                        const res = await fetch(fetchUrl);
+                        if (!res.ok) throw new Error('Network Error');
+                        let text = await res.text();
+                        
+                        if (strat.wrapper) {
+                            const data = JSON.parse(text);
+                            text = data.contents;
+                        }
+
+                        const start = text.indexOf('{');
+                        const end = text.lastIndexOf('}') + 1;
+                        if (start > -1 && end > -1) {
+                            successJson = JSON.parse(text.substring(start, end));
+                            fetchSuccess = true;
+                            break; 
+                        }
+                    } catch(e) {
+                        console.warn(`GSheet Strat ${strat.name} failed`, e);
+                    }
+                }
+
+                if (!fetchSuccess || !successJson || !successJson.table) {
+                    if (offset === 0) {
+                        updateStatus('讀取失敗：無法存取試算表。', 'error');
+                        hasMore = false;
+                    } else {
+                        updateStatus(`讀取中斷，部分資料已更新 (${totalFetched} 筆)`, 'error');
+                        hasMore = false;
+                    }
+                    break;
+                }
+
+                const rows = successJson.table.rows;
                 
-                let cutoffTime = 0;
-                if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000); 
-                else if (autoRefreshRange === '7') cutoffTime = today.getTime() - (6 * 86400000);
-                else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
-                else if (autoRefreshRange === 'ALL') cutoffTime = 0;
+                if (rows.length === 0) {
+                    hasMore = false;
+                    break;
+                }
 
-                const batchData = {}; 
+                let batchProcessedCount = 0;
+                let stopFetching = false;
 
-                rows.forEach(row => {
+                // Process Rows
+                for (const row of rows) {
                     const c = row.c; 
-                    if(!c) return;
+                    if(!c) continue;
                     const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
                     const rowDateStr = getVal(cols.date);
-                    if (!rowDateStr) return;
+                    if (!rowDateStr) continue;
 
-                    let keyDate = String(rowDateStr).trim();
-                    const dObj = new Date(String(rowDateStr).replace(/\//g, '-'));
+                    let keyDateStr = String(rowDateStr).trim();
+                    // Normalize slash to dash for parsing
+                    const dObj = new Date(keyDateStr.replace(/\//g, '-'));
                     
-                    if (isNaN(dObj.getTime())) return;
-                    if (autoRefreshRange !== 'ALL' && dObj.getTime() < cutoffTime) return;
+                    if (isNaN(dObj.getTime())) continue;
 
-                    keyDate = dObj.toISOString().split('T')[0];
+                    // Generate standardized YYYY-MM-DD string from object
+                    const rowIsoDate = dObj.toISOString().split('T')[0];
+
+                    // --- STOP LOGIC START ---
+                    if (manualTargetDateStr) {
+                        // MANUAL MODE LOGIC
+                        if (rowIsoDate === manualTargetDateStr) {
+                            // MATCH: We want this row. Proceed to parse.
+                        } else if (dObj < new Date(manualTargetDateStr)) {
+                            // OLDER: We went past the target date. STOP.
+                            // Since it's sorted DESC, all subsequent rows are older.
+                            stopFetching = true;
+                            continue; // Skip this row
+                        } else {
+                            // NEWER: We are looking at a future date (or just newer), skip but continue looking
+                            continue;
+                        }
+                    } else {
+                        // AUTO REFRESH MODE LOGIC
+                        // Optimization: Stop if date is older than cutoff (only for Auto Refresh modes)
+                        if (autoRefreshRange !== 'ALL' && autoRefreshRange && dObj.getTime() < cutoffTime) {
+                            stopFetching = true;
+                            // continue loop to process remaining buffer? No, sorted DESC means we are done.
+                            // break loop logic handles outside for loop.
+                        }
+                    }
+                    // --- STOP LOGIC END ---
 
                     const parsed = parseRow(row);
                     if(parsed) {
-                        if (!batchData[keyDate]) batchData[keyDate] = [];
-                        batchData[keyDate].push(parsed);
+                        // Important: First time we see a date in this session, CLEAR existing data for that day to avoid duplication
+                        // Because we might be re-fetching data that changed.
+                        if (!seenDates.has(rowIsoDate)) {
+                            // OPTIMIZATION: Do not store config for every date
+                            db[rowIsoDate] = {
+                                rows: []
+                            };
+                            seenDates.add(rowIsoDate);
+                        }
+                        db[rowIsoDate].rows.push(parsed);
+                        batchProcessedCount++;
                     }
-                });
-
-                let updateCount = 0;
-                Object.keys(batchData).forEach(k => {
-                    db[k] = {
-                        config: { sheetId, cols },
-                        rows: batchData[k]
-                    };
-                    updateCount++;
-                });
-                
-                saveDB(db);
-                
-                if (currentReportDate && db[currentReportDate]) {
-                    loadReportByDate(currentReportDate, true);
-                } else {
-                    updateHistoryList();
-                    if (activeTab === 'ANALYSIS') renderTrendAnalysis();
                 }
-                
-                const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天';
-                const msg = `刷新完成 (範圍: ${rangeLabel}, 更新 ${updateCount} 天)`;
-                
-                updateStatus(msg, 'success');
-                showToast(msg);
 
-            } else {
-                // === MANUAL SINGLE DATE MODE ===
-                const fetchedData = [];
-                rows.forEach(row => {
-                    const c = row.c;
-                    if (!c) return;
-                    const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
-                    let rowDate = getVal(cols.date);
-                    if (!rowDate || !String(rowDate).includes(pickerDate)) return;
+                totalFetched += batchProcessedCount;
+                offset += BATCH_SIZE;
+
+                // --- BATCH SAVE & UPDATE UI (Only for Interactive Read All) ---
+                if (isInteractiveReadAll) {
+                    const saveSuccess = saveDB(db);
+                    updateHistoryList();
+                    if (!saveSuccess) {
+                        hasMore = false; 
+                        updateStatus(`儲存空間已滿，已停止讀取。目前更新至 ${totalFetched} 筆`, 'error');
+                        break;
+                    }
+                    updateStatus(`讀取中... 已更新 ${totalFetched} 筆 (由新到舊)`, 'success');
                     
-                    const parsed = parseRow(row);
-                    if(parsed) fetchedData.push(parsed);
-                });
+                    // Refresh view if needed
+                    if (currentReportDate && seenDates.has(currentReportDate)) {
+                        loadReportByDate(currentReportDate, true);
+                    }
+                }
 
-                currentDailyData.config = { sheetId, cols }; 
-                currentDailyData.rows = fetchedData;
-                updateStatus(`成功：已讀取 ${currentDailyData.rows.length} 筆資料`, 'success');
-                saveCurrentReport(); 
-                updateRawPreview();
-                showToast('資料已更新並儲存');
-                
-                if (activeTab !== 'OVERVIEW') {
-                    switchTab('OVERVIEW');
+                // Check stop conditions
+                // If rows < BATCH_SIZE, we reached end of sheet naturally.
+                // If stopFetching flag is true, we reached our cutoff/target.
+                if (rows.length < BATCH_SIZE || stopFetching) {
+                    hasMore = false;
                 } else {
-                    renderData();
+                    // Small delay to prevent rate limiting
+                    await new Promise(r => setTimeout(r, 50));
                 }
             }
+            
+            // --- FINAL SAVE & UPDATE UI ---
+            let saveSuccess = true;
+            if (!isInteractiveReadAll) {
+                // For Manual and standard Auto Refresh, we save ONCE at the end.
+                saveSuccess = saveDB(db);
+            }
+            
+            if (!saveSuccess) {
+                updateStatus(`儲存空間已滿，部分舊資料可能已清理以騰出空間。`, 'error');
+            } else {
+                if (!autoRefreshRange) {
+                    // Manual Mode Finalization
+                    const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
+                    headerBtn.disabled = false;
+                    btn.disabled = false;
+                    headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
+                    btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料';
+                    
+                    // Manual mode completion behavior
+                    if (currentDailyData.rows.length === 0 && !pickerDate) {
+                         // Try to load latest available
+                         const availableDates = Object.keys(db).sort().reverse();
+                         if (availableDates.length > 0) loadReportByDate(availableDates[0]);
+                    } else if (pickerDate) {
+                         // Ensure the picked date is loaded if available
+                         if (db[pickerDate]) {
+                             loadReportByDate(pickerDate);
+                             updateStatus(`更新完成：${pickerDate} (共 ${totalFetched} 筆)`, 'success');
+                         } else {
+                             // If we fetched 0 records for the target date
+                             if (totalFetched === 0) {
+                                 // Maybe it wasn't found in the top rows?
+                                 // But logic says we scan until we find older.
+                                 // So it implies no data for that date exists (or sort order is wrong in sheet).
+                                 updateStatus(`查無 ${pickerDate} 的資料 (或資料過舊)`, 'error');
+                             } else {
+                                 showToast('所選日期尚無資料');
+                             }
+                         }
+                    }
+                    
+                    if (activeTab !== 'OVERVIEW') {
+                        switchTab('OVERVIEW');
+                    }
+                } else {
+                    // Auto Refresh Finalization (and Interactive Read All Final Status)
+                    const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天';
+                    const msg = `刷新完成 (範圍: ${rangeLabel}, 共 ${totalFetched} 筆)`;
+                    updateStatus(msg, 'success');
+                    showToast(msg);
+                    
+                    // Refresh current view if relevant
+                    updateHistoryList();
+                    if (currentReportDate && db[currentReportDate]) {
+                        loadReportByDate(currentReportDate, true); // true = prevent tab switch, just refresh data
+                    }
+                    if (activeTab === 'ANALYSIS') renderTrendAnalysis();
+                }
+            }
+            
+            updateRawPreview();
         }
 
         // --- RENDER LOGIC ---
