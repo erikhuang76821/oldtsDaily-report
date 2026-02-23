@@ -859,11 +859,10 @@
         let trendChartInstance = null;
         let isMergeMode = false;
 
-        let ruleToDeleteIndex = -1;
         let ruleToEditIndex = -1;
         let ruleToEditGroupIndex = -1;
-        let deleteType = '';
         let onConfirmAction = null;
+        let toastTimer = null;
 
         let autoRefreshTimer = null;
 
@@ -960,8 +959,8 @@
             await loadReportByDate(today);
 
             // --- 預設自動刷新邏輯開始 ---
-            fetchGoogleSheetData('3');
-            startAutoRefresh(10, '3');
+            fetchGoogleSheetData('4');
+            startAutoRefresh(10, '4');
             // --- 預設自動刷新邏輯結束 ---
 
             const scrollContainer = document.getElementById('scrollContainer');
@@ -1029,9 +1028,7 @@
             badge.innerHTML = `<i class="fa-solid fa-circle-play mr-1"></i> 每 ${minutes} 分鐘刷新`;
 
             let rangeLabel = '全部';
-            if (range === '3') rangeLabel = '近3天';
-            if (range === '7') rangeLabel = '近7天';
-            if (range === '30') rangeLabel = '近1月';
+            if (range !== 'ALL' && !isNaN(parseInt(range))) rangeLabel = `近${range}天`;
 
             showToast(`已啟用自動刷新 (每 ${minutes} 分鐘, 範圍: ${rangeLabel})`);
 
@@ -1328,10 +1325,12 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000);
-            else if (autoRefreshRange === '7') cutoffTime = today.getTime() - (6 * 86400000);
-            else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
-            else if (autoRefreshRange === 'ALL') cutoffTime = 0;
+            if (autoRefreshRange === 'ALL') {
+                cutoffTime = 0;
+            } else if (autoRefreshRange && !isNaN(parseInt(autoRefreshRange))) {
+                const days = parseInt(autoRefreshRange);
+                cutoffTime = today.getTime() - ((days - 1) * 86400000);
+            }
             else if (!autoRefreshRange && pickerDate) {
                 manualTargetDateStr = pickerDate.trim();
             }
@@ -1746,7 +1745,7 @@
 
             document.getElementById('mergeNameInput').value = defaultName;
             const listEl = document.getElementById('mergeListPreview');
-            listEl.innerHTML = selectedNames.map(name => `<li>${name}</li>`).join('');
+            listEl.innerHTML = selectedNames.map(name => `<li>${escapeHtml(name)}</li>`).join('');
 
             document.getElementById('mergeDialogOverlay').classList.remove('hidden');
             document.getElementById('mergeNameInput').focus();
@@ -1927,8 +1926,6 @@
         }
 
         function deleteGroupRule(index) {
-            ruleToDeleteIndex = index;
-            deleteType = 'group';
             showConfirmDialog(
                 '移除規則',
                 '確定要刪除此來源合併規則嗎？',
@@ -1990,8 +1987,6 @@
         }
 
         function deleteProjectRule(index) {
-            ruleToDeleteIndex = index;
-            deleteType = 'project';
             showConfirmDialog(
                 '移除規則',
                 '確定要刪除此專案合併規則嗎？',
@@ -2040,9 +2035,7 @@
             showToast('名稱已更新');
         }
 
-        function executeDeleteRule() {
-            // This is now handled by the callback in showConfirmDialog
-        }
+
 
         function renderSettingsTab() {
             const projContainer = document.getElementById('mergeRulesContainer');
@@ -2690,14 +2683,10 @@
 
             const data = await getReportData(date);
 
-            if (!data) {
+            if (!data || !data.rows) {
                 currentDailyData.rows = [];
             } else {
-                if (data.rows) {
-                    currentDailyData = data;
-                } else {
-                    currentDailyData.rows = [];
-                }
+                currentDailyData.rows = data.rows;
             }
 
             if (preventTabSwitch) {
@@ -2712,30 +2701,25 @@
             }
         }
 
-        async function switchToPreviousDay() {
-            const currentDate = currentReportDate;
-            const dateObj = new Date(currentDate + 'T00:00:00');
-            dateObj.setDate(dateObj.getDate() - 1);
-
+        function dateToISO(dateObj) {
             const year = dateObj.getFullYear();
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
             const day = String(dateObj.getDate()).padStart(2, '0');
-            const prevDayISO = `${year}-${month}-${day}`;
+            return `${year}-${month}-${day}`;
+        }
 
+        async function switchToPreviousDay() {
+            const dateObj = new Date(currentReportDate + 'T00:00:00');
+            dateObj.setDate(dateObj.getDate() - 1);
+            const prevDayISO = dateToISO(dateObj);
             await loadReportByDate(prevDayISO);
             showToast(`已切換至前日 (${prevDayISO})`);
         }
 
         async function switchToNextDay() {
-            const currentDate = currentReportDate;
-            const dateObj = new Date(currentDate + 'T00:00:00');
+            const dateObj = new Date(currentReportDate + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
-
-            const year = dateObj.getFullYear();
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const nextDayISO = `${year}-${month}-${day}`;
-
+            const nextDayISO = dateToISO(dateObj);
             await loadReportByDate(nextDayISO);
             showToast(`已切換至後日 (${nextDayISO})`);
         }
@@ -2774,6 +2758,7 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             showToast('設定(組別/專案規則)已匯出');
         }
 
@@ -2805,9 +2790,13 @@
 
         function showToast(msg) {
             const toast = document.getElementById('toast');
+            if (toastTimer) clearTimeout(toastTimer);
             toast.innerText = msg;
             toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+            toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toastTimer = null;
+            }, 3000);
         }
     </script>
 </body>

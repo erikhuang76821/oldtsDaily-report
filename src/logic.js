@@ -27,6 +27,22 @@ export const DEFAULT_GROUP_MERGES = [
     { alias: '客服', originals: ['客服組', '【客服組】', '客服_VIP', '客服_值班者'] },
 ];
 
+// --- Helper ---
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '`': '&#96;',
+    '/': '&#x2F;',
+};
+
+export function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"'`/]/g, (ch) => HTML_ESCAPE_MAP[ch]);
+}
+
 // --- Pure Functions ---
 
 /**
@@ -75,11 +91,13 @@ export function getUserId(name) {
 }
 
 /**
- * 內容文字格式化：為特定關鍵字加 bold span
+ * 內容文字格式化：先 escape HTML 特殊字元，再為特定關鍵字加 bold span
+ * 注意：需先 escape 以防止 XSS，再插入安全的 HTML span
  */
 export function formatContent(text) {
     if (!text) return '(無內容)';
-    return text.replace(
+    const safe = escapeHtml(text);
+    return safe.replace(
         /(測試內容|工作事項|問題回報)/g,
         '<span class="font-bold text-slate-800">$1</span>',
     );
