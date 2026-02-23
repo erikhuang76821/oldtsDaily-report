@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>團隊日報管理系統</title>
+    <title>團隊日報管理系統 (GS版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Chart.js for Pie Chart -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- LocalForage for IndexedDB (Client Storage Optimization) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -121,7 +123,6 @@
             </div>
         </div>
 
-        <!-- 移除原有的資料管理區塊 (Point 2) -->
     </aside>
 
     <!-- Main Content -->
@@ -191,7 +192,7 @@
                             <div>
                                 <label class="block text-sm font-bold text-slate-600 mb-1">Google Sheet ID (試算表 ID)</label>
                                 <div class="flex gap-2">
-                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入 ID 例如: -">
+                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入ID">
                                 </div>
                             </div>
                         </div>
@@ -662,19 +663,15 @@
     <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
 
     <!-- Floating Buttons Container (FEATURE 2) -->
-    <!-- Up Arrow (Back to Top / Result) - Now at bottom-24 -->
     <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-24 right-5 md:bottom-24 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5 hidden">
         <i class="fa-solid fa-arrow-up text-xl"></i>
     </button>
-
-    <!-- Down Arrow (Go to Analysis) - Now at bottom-5 (Swapped Position, Matching Style, Larger Icon) -->
     <button onclick="scrollToAnalysis()" id="goToAnalysisBtn" class="fixed bottom-5 right-5 md:bottom-5 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 transform translate-y-0 hidden">
         <i class="fa-solid fa-arrow-down text-xl"></i>
     </button>
 
     <script>
         // --- HELPER FUNCTION ---
-        // Function to convert column index to letter (0->A, 1->B, etc.)
         function getColLetter(index) {
             let letter = '';
             while (index >= 0) {
@@ -684,43 +681,105 @@
             return letter;
         }
 
-        // --- STORAGE & STATE MANAGER ---
-        const DB_KEY = 'daily_reports_db_v6_gs_clean'; 
+        // --- ASYNC STORAGE MANAGER (IndexedDB via localForage) ---
+        // 優化說明：將巨大單一物件拆分為「每天獨立一個 Key」，大幅減少讀取負擔。
+        const DB_PREFIX = 'daily_report_';
+        const DATES_KEY = 'daily_report_dates_v1';
+        const OLD_DB_KEY = 'daily_reports_db_v6_gs_clean'; // 用於無痛升級
         const SETTINGS_KEY = 'daily_reports_settings_v1';
-        let currentReportDate = '';
-        let projectChartInstance = null; // Store chart instance
-        let trendChartInstance = null; // Store trend chart instance (New)
-        let isMergeMode = false; // Track if we are in merge selection mode
         
-        let ruleToDeleteIndex = -1; // Track index for deletion (Legacy use inside confirm)
-        let ruleToEditIndex = -1; // Track index for editing
-        let ruleToEditGroupIndex = -1; // Track index for editing group rules
-        let deleteType = ''; // 'project' or 'group'
-        let onConfirmAction = null; // Callback for generic confirm modal
+        localforage.config({
+            name: 'DailyReportSystem',
+            storeName: 'reports_data'
+        });
 
-        let autoRefreshTimer = null; // FEATURE 1: Timer ID
+        async function getAvailableDates() {
+            const dates = await localforage.getItem(DATES_KEY);
+            return dates || [];
+        }
+
+        async function saveAvailableDates(datesArray) {
+            // Ensure unique, sorted desc
+            const unique = Array.from(new Set(datesArray)).sort().reverse();
+            await localforage.setItem(DATES_KEY, unique);
+            return unique;
+        }
+
+        async function getReportData(date) {
+            const data = await localforage.getItem(DB_PREFIX + date);
+            return data || { rows: [] };
+        }
+
+        // 批次寫入：確保每次寫入後會更新日期索引表
+        async function saveBulkData(dbBufferObj) {
+            let existingDates = await getAvailableDates();
+            let changed = false;
+            
+            const promises = [];
+            for (const [date, data] of Object.entries(dbBufferObj)) {
+                promises.push(localforage.setItem(DB_PREFIX + date, data));
+                if (!existingDates.includes(date)) {
+                    existingDates.push(date);
+                    changed = true;
+                }
+            }
+            await Promise.all(promises);
+            
+            if (changed) {
+                await saveAvailableDates(existingDates);
+            }
+        }
+
+        // --- 無痛升級機制 ---
+        // 將舊版存在 LocalStorage 的龐大字串自動搬移至 IndexedDB 並清理
+        async function migrateOldData() {
+            const oldDataStr = localStorage.getItem(OLD_DB_KEY);
+            if (oldDataStr) {
+                try {
+                    const oldData = JSON.parse(oldDataStr);
+                    await saveBulkData(oldData);
+                    localStorage.removeItem(OLD_DB_KEY);
+                    console.log("舊版資料已成功遷移至 IndexedDB");
+                } catch (e) {
+                    console.error("轉移舊版資料失敗", e);
+                }
+            }
+        }
+
+        // --- STATE MANAGER ---
+        let currentReportDate = '';
+        let projectChartInstance = null; 
+        let trendChartInstance = null; 
+        let isMergeMode = false; 
+        
+        let ruleToDeleteIndex = -1; 
+        let ruleToEditIndex = -1; 
+        let ruleToEditGroupIndex = -1; 
+        let deleteType = ''; 
+        let onConfirmAction = null; 
+
+        let autoRefreshTimer = null; 
         
         // Analysis State
-        let analysisMode = 'PROJECT'; // 'PROJECT', 'PERSON', or 'GROUP'
-        let activeTrendFilter = null; // Store current drill-down filter (e.g., 'John', 'Project A')
-        let selectedPersons = new Set(); // New: Set to store selected people for comparison
-        let shouldSelectAllPersons = false; // Flag to select all persons on first switch to PERSON mode
+        let analysisMode = 'PROJECT'; 
+        let activeTrendFilter = null; 
+        let selectedPersons = new Set(); 
+        let shouldSelectAllPersons = false; 
         
-        let selectedProjects = new Set(); // Comparison set for Projects
-        let shouldSelectAllProjects = true; // Flag to select all projects on first switch (Default true to load data on start)
+        let selectedProjects = new Set(); 
+        let shouldSelectAllProjects = true; 
 
-        let currentTotalEntitiesCount = 0; // NEW: To track total count for "Select All" logic (shared context)
+        let currentTotalEntitiesCount = 0; 
         
-        // Data Model
+        // Data Model (目前顯示的這天)
         let currentDailyData = {
             config: {
-                sheetId: '',
+                sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
                 cols: { date: 0, group: 8, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
             },
             rows: []
         };
         
-        // Default Group Merges requested by user
         const DEFAULT_GROUP_MERGES = [
             { alias: '品檢', originals: ['品檢組', '品檢','品檢_早班','品檢_中班','品檢_緯創'] },
             { alias: '技術', originals: ['技術', '技術組'] },
@@ -730,7 +789,6 @@
             { alias: '客服', originals: ['客服組', '【客服組】','客服_VIP','客服_值班者'] }
         ];
 
-        // Global Settings Model
         let globalSettings = {
             projectMerges: [],
             groupMerges: []
@@ -739,7 +797,6 @@
         let activeTab = 'OVERVIEW'; 
         let activeFilterGroup = 'ALL'; 
 
-        // Chart Colors Palette
         const CHART_COLORS = [
             '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
             '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6',
@@ -747,19 +804,22 @@
         ];
         function getColor(index) { return CHART_COLORS[index % CHART_COLORS.length]; }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        // Initialize (改為 Async)
+        document.addEventListener('DOMContentLoaded', async () => {
             loadGlobalSettings();
+            
+            // 執行資料庫轉移
+            await migrateOldData();
+
             const today = new Date().toISOString().split('T')[0];
-            updateHistoryList();
-            loadReportByDate(today);
+            await updateHistoryList();
+            await loadReportByDate(today);
             
             // --- 預設自動刷新邏輯開始 ---
             fetchGoogleSheetData('3');
             startAutoRefresh(10, '3');
             // --- 預設自動刷新邏輯結束 ---
 
-            // Initial scroll listener setup
             const scrollContainer = document.getElementById('scrollContainer');
             if (scrollContainer) {
                 scrollContainer.addEventListener('scroll', handleScroll);
@@ -788,7 +848,7 @@
 
         function saveGlobalSettings() {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(globalSettings));
-            renderSettingsTab(); // Update UI
+            renderSettingsTab(); 
         }
 
         // --- FEATURE 1: AUTO REFRESH LOGIC ---
@@ -857,28 +917,23 @@
             
             if (!scrollContainer) return;
 
-            // Only act if we are in OVERVIEW tab (Point 1 fix)
-            if (activeTab !== 'OVERVIEW') {
-                return;
-            }
+            if (activeTab !== 'OVERVIEW') return;
 
             const scrollTop = scrollContainer.scrollTop;
             const scrollHeight = scrollContainer.scrollHeight;
             const clientHeight = scrollContainer.clientHeight;
 
-            // Logic for UP Arrow
             if (scrollTop > 400) {
-                upBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); // ensure not hidden
+                upBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); 
                 upBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
                 upBtn.classList.remove('opacity-100', 'translate-y-0');
                 upBtn.classList.add('opacity-0', 'translate-y-5');
             }
 
-            // Logic for DOWN Arrow
             const isNearBottom = (scrollHeight - scrollTop - clientHeight) < 200;
             if (scrollHeight > clientHeight + 100 && !isNearBottom) {
-                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); // ensure not hidden
+                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); 
                 downBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
                 downBtn.classList.remove('opacity-100', 'translate-y-0');
@@ -888,16 +943,12 @@
         
         function scrollToResult() {
             const anchor = document.getElementById('resultAnchor');
-            if (anchor) {
-                anchor.scrollIntoView({ behavior: 'smooth' });
-            }
+            if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
         }
         
         function scrollToAnalysis() {
             const anchor = document.getElementById('analysisAnchor');
-            if (anchor) {
-                anchor.scrollIntoView({ behavior: 'smooth' });
-            }
+            if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
         }
 
         function getUserId(name) {
@@ -914,7 +965,6 @@
             }
         }
 
-        // Sidebar Toggle Logic
         function toggleSidebar() {
             const sidebar = document.getElementById('mainSidebar');
             if (sidebar.classList.contains('hidden')) {
@@ -926,60 +976,14 @@
             }
         }
 
-        function getDB() {
-            const data = localStorage.getItem(DB_KEY);
-            return data ? JSON.parse(data) : {};
-        }
-
-        function saveDB(data) {
-            try {
-                localStorage.setItem(DB_KEY, JSON.stringify(data));
-                updateHistoryList();
-                return true; // Success
-            } catch (e) {
-                if (e.name === 'QuotaExceededError' || e.code === 22) {
-                    // Strategy: Prune oldest data
-                    // Get all keys (dates)
-                    const keys = Object.keys(data).sort(); // Ascending: Oldest first
-                    
-                    // Logic to remove a chunk to avoid too many retries
-                    // Try removing 1 item or 10%? Let's remove 1 for safety, or maybe 5 to reduce thrashing.
-                    if (keys.length > 0) {
-                        const keyToRemove = keys[0];
-                        delete data[keyToRemove]; // Remove from memory object
-                        
-                        console.warn(`LocalStorage Limit Reached. Pruning oldest record: ${keyToRemove}`);
-                        
-                        // Notify user only once or throttle? 
-                        // Since this function is recursive, we might spam toasts.
-                        // Let's rely on the final state or check a global flag?
-                        // For simplicity, update the status message area instead of Toast if possible, or just a generic Toast.
-                        
-                        // Retry saving
-                        return saveDB(data);
-                    } else {
-                        // DB is empty but still cant save? (Metadata too huge? Impossible usually)
-                        showToast('儲存空間已滿且無法釋放更多空間。');
-                        return false;
-                    }
-                } else {
-                    console.error('Storage Error', e);
-                    showToast('儲存時發生錯誤');
-                    return false;
-                }
-            }
-        }
-
         // --- TAB LOGIC ---
         function switchTab(tab) {
             activeTab = tab;
 
-            // UI Buttons
             document.querySelectorAll('.header-tab-btn').forEach(btn => btn.classList.remove('active'));
             const tabBtn = document.getElementById(`tab-${tab}`);
             if(tabBtn) tabBtn.classList.add('active');
             
-            // Sections
             const sourceSec = document.getElementById('sourceSection');
             const overviewSec = document.getElementById('overviewSection');
             const settingsSec = document.getElementById('settingsSection');
@@ -990,19 +994,16 @@
             settingsSec.classList.add('hidden');
             analysisSec.classList.add('hidden');
 
-            // Floating Arrow Buttons Logic (Point 1 Fix)
             const upBtn = document.getElementById('backToResultBtn');
             const downBtn = document.getElementById('goToAnalysisBtn');
 
             if (tab === 'OVERVIEW') {
                 overviewSec.classList.remove('hidden');
                 renderData(); 
-                // Unhide them so handleScroll can manage them (but handleScroll might hide them initially)
                 upBtn.classList.add('hidden'); 
                 downBtn.classList.add('hidden');
                 setTimeout(handleScroll, 100);
             } else {
-                // For all other tabs, FORCE HIDE
                 upBtn.classList.add('hidden');
                 downBtn.classList.add('hidden');
                 
@@ -1011,7 +1012,6 @@
                     renderTrendAnalysis();
                 } else if (tab === 'SOURCE') {
                     sourceSec.classList.remove('hidden');
-                    // Only update inputs if config exists in loaded data
                     if (currentDailyData.config && currentDailyData.config.sheetId) {
                          document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
                          document.getElementById('colDate').value = currentDailyData.config.cols.date;
@@ -1085,7 +1085,6 @@
             const btn = document.getElementById('confirmActionBtn');
             const iconContainer = document.getElementById('confirmIconContainer');
             
-            // Customize look based on action type
             if (isDelete) {
                 btn.className = "px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition flex-1 shadow-lg shadow-rose-200";
                 iconContainer.className = "w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4";
@@ -1117,13 +1116,14 @@
                 '確認讀取全部資料', 
                 '即將重新讀取 Google Sheet 上的所有歷史資料。若資料量較大可能會需要一點時間，確定要繼續嗎？',
                 () => {
-                    fetchGoogleSheetData('ALL', true); // Modified: Enable batch write for interactive Read All
+                    fetchGoogleSheetData('ALL', true); 
                 },
                 false
             );
         }
 
         // --- GOOGLE SHEET FETCH LOGIC (Main Driver) ---
+        // 優化說明：將獲取的資料存入緩衝物件 dbBuffer，抓取結束後一次寫入 IndexedDB 的不同 Key 中。
         async function fetchGoogleSheetData(autoRefreshRange = null, isInteractiveReadAll = false) {
             const sheetId = document.getElementById('gsheetId').value.trim();
             const pickerDate = document.getElementById('reportDatePicker').value;
@@ -1151,7 +1151,6 @@
                 link:  parseInt(document.getElementById('colLink').value) || 7
             };
 
-            // --- UI Busy State (Only for Manual) ---
             if (!autoRefreshRange) {
                 const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
                 headerBtn.disabled = true;
@@ -1165,20 +1164,22 @@
                 statusMsg.innerHTML = msg;
             };
 
-            // Config for Batching
-            const BATCH_SIZE = 500;
+            const BATCH_SIZE = 2500;
             let offset = 0;
             let hasMore = true;
-            let totalFetched = 0;
+            let totalFetched = 0; 
+            
             const seenDates = new Set();
-            const db = getDB(); // Load existing DB to merge
+            const dbBuffer = {}; // 暫存這次請求所抓取的所有資料
             
             const dateColIndex = parseInt(document.getElementById('colDate').value) || 0;
             const dateColLetter = getColLetter(dateColIndex);
+            
+            const nameColIndex = parseInt(document.getElementById('colName').value) || 2;
+            const nameColLetter = getColLetter(nameColIndex);
 
-            // Determine Cutoff Time for Optimization
             let cutoffTime = 0;
-            let manualTargetDateStr = null; // For manual mode only
+            let manualTargetDateStr = null; 
 
             const today = new Date();
             today.setHours(0,0,0,0);
@@ -1188,8 +1189,7 @@
             else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
             else if (autoRefreshRange === 'ALL') cutoffTime = 0;
             else if (!autoRefreshRange && pickerDate) {
-                // Manual Mode: Setup strict date target
-                manualTargetDateStr = pickerDate.trim(); // YYYY-MM-DD
+                manualTargetDateStr = pickerDate.trim(); 
             }
 
             const strategies = [
@@ -1198,7 +1198,6 @@
                 { url: (tq) => `https://api.allorigins.win/get?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&tq=${tq}`)}`, name: 'AllOrigins', wrapper: true }
             ];
 
-            // Helper to parse row
             const parseRow = (row) => {
                 const c = row.c;
                 if (!c) return null;
@@ -1222,14 +1221,11 @@
                 };
             };
 
-            // Loop for Batching
             while (hasMore) {
-                // Construct Query: Order by Date DESC to get newest first
-                const tqParam = encodeURIComponent(`select * order by ${dateColLetter} desc limit ${BATCH_SIZE} offset ${offset}`);
+                const tqParam = encodeURIComponent(`select * order by ${dateColLetter} desc, ${nameColLetter} asc limit ${BATCH_SIZE} offset ${offset}`);
                 let successJson = null;
                 let fetchSuccess = false;
 
-                // Try Strategies
                 for (const strat of strategies) {
                     try {
                         const fetchUrl = strat.url(tqParam);
@@ -1273,9 +1269,7 @@
                 }
 
                 let batchProcessedCount = 0;
-                let stopFetching = false;
 
-                // Process Rows
                 for (const row of rows) {
                     const c = row.c; 
                     if(!c) continue;
@@ -1284,51 +1278,39 @@
                     if (!rowDateStr) continue;
 
                     let keyDateStr = String(rowDateStr).trim();
-                    // Normalize slash to dash for parsing
-                    const dObj = new Date(keyDateStr.replace(/\//g, '-'));
+                    let dObj;
+                    
+                    const gsDateMatch = keyDateStr.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
+                    if (gsDateMatch) {
+                        dObj = new Date(parseInt(gsDateMatch[1]), parseInt(gsDateMatch[2]), parseInt(gsDateMatch[3]));
+                    } else {
+                        dObj = new Date(keyDateStr.replace(/-/g, '/'));
+                    }
                     
                     if (isNaN(dObj.getTime())) continue;
 
-                    // Generate standardized YYYY-MM-DD string from object
-                    const rowIsoDate = dObj.toISOString().split('T')[0];
+                    const year = dObj.getFullYear();
+                    const month = String(dObj.getMonth() + 1).padStart(2, '0');
+                    const day = String(dObj.getDate()).padStart(2, '0');
+                    const rowIsoDate = `${year}-${month}-${day}`;
 
-                    // --- STOP LOGIC START ---
                     if (manualTargetDateStr) {
-                        // MANUAL MODE LOGIC
-                        if (rowIsoDate === manualTargetDateStr) {
-                            // MATCH: We want this row. Proceed to parse.
-                        } else if (dObj < new Date(manualTargetDateStr)) {
-                            // OLDER: We went past the target date. STOP.
-                            // Since it's sorted DESC, all subsequent rows are older.
-                            stopFetching = true;
-                            continue; // Skip this row
-                        } else {
-                            // NEWER: We are looking at a future date (or just newer), skip but continue looking
+                        if (rowIsoDate !== manualTargetDateStr) {
+                            continue; 
+                        }
+                    } else if (autoRefreshRange !== 'ALL' && autoRefreshRange) {
+                        if (dObj.getTime() < cutoffTime) {
                             continue;
                         }
-                    } else {
-                        // AUTO REFRESH MODE LOGIC
-                        // Optimization: Stop if date is older than cutoff (only for Auto Refresh modes)
-                        if (autoRefreshRange !== 'ALL' && autoRefreshRange && dObj.getTime() < cutoffTime) {
-                            stopFetching = true;
-                            // continue loop to process remaining buffer? No, sorted DESC means we are done.
-                            // break loop logic handles outside for loop.
-                        }
                     }
-                    // --- STOP LOGIC END ---
 
                     const parsed = parseRow(row);
                     if(parsed) {
-                        // Important: First time we see a date in this session, CLEAR existing data for that day to avoid duplication
-                        // Because we might be re-fetching data that changed.
                         if (!seenDates.has(rowIsoDate)) {
-                            // OPTIMIZATION: Do not store config for every date
-                            db[rowIsoDate] = {
-                                rows: []
-                            };
+                            dbBuffer[rowIsoDate] = { rows: [] };
                             seenDates.add(rowIsoDate);
                         }
-                        db[rowIsoDate].rows.push(parsed);
+                        dbBuffer[rowIsoDate].rows.push(parsed);
                         batchProcessedCount++;
                     }
                 }
@@ -1336,68 +1318,44 @@
                 totalFetched += batchProcessedCount;
                 offset += BATCH_SIZE;
 
-                // --- BATCH SAVE & UPDATE UI (Only for Interactive Read All) ---
                 if (isInteractiveReadAll) {
-                    const saveSuccess = saveDB(db);
-                    updateHistoryList();
-                    if (!saveSuccess) {
-                        hasMore = false; 
-                        updateStatus(`儲存空間已滿，已停止讀取。目前更新至 ${totalFetched} 筆`, 'error');
-                        break;
-                    }
-                    updateStatus(`讀取中... 已更新 ${totalFetched} 筆 (由新到舊)`, 'success');
+                    await saveBulkData(dbBuffer);
+                    await updateHistoryList();
+                    updateStatus(`讀取中... 已擷取 ${totalFetched} 筆符合條件資料`, 'success');
                     
-                    // Refresh view if needed
                     if (currentReportDate && seenDates.has(currentReportDate)) {
-                        loadReportByDate(currentReportDate, true);
+                        await loadReportByDate(currentReportDate, true);
                     }
                 }
 
-                // Check stop conditions
-                // If rows < BATCH_SIZE, we reached end of sheet naturally.
-                // If stopFetching flag is true, we reached our cutoff/target.
-                if (rows.length < BATCH_SIZE || stopFetching) {
+                if (rows.length < BATCH_SIZE) {
                     hasMore = false;
                 } else {
-                    // Small delay to prevent rate limiting
                     await new Promise(r => setTimeout(r, 50));
                 }
             }
             
-            // --- FINAL SAVE & UPDATE UI ---
-            let saveSuccess = true;
-            if (!isInteractiveReadAll) {
-                // For Manual and standard Auto Refresh, we save ONCE at the end.
-                saveSuccess = saveDB(db);
-            }
-            
-            if (!saveSuccess) {
-                updateStatus(`儲存空間已滿，部分舊資料可能已清理以騰出空間。`, 'error');
-            } else {
+            // 寫入緩衝資料到 IndexedDB
+            try {
+                await saveBulkData(dbBuffer);
+                
                 if (!autoRefreshRange) {
-                    // Manual Mode Finalization
                     const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
                     headerBtn.disabled = false;
                     btn.disabled = false;
                     headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
                     btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料';
                     
-                    // Manual mode completion behavior
                     if (currentDailyData.rows.length === 0 && !pickerDate) {
-                         // Try to load latest available
-                         const availableDates = Object.keys(db).sort().reverse();
-                         if (availableDates.length > 0) loadReportByDate(availableDates[0]);
+                         const availableDates = await getAvailableDates();
+                         if (availableDates.length > 0) await loadReportByDate(availableDates[0]);
                     } else if (pickerDate) {
-                         // Ensure the picked date is loaded if available
-                         if (db[pickerDate]) {
-                             loadReportByDate(pickerDate);
-                             updateStatus(`更新完成：${pickerDate} (共 ${totalFetched} 筆)`, 'success');
+                         const targetData = await getReportData(pickerDate);
+                         if (targetData && targetData.rows && targetData.rows.length > 0) {
+                             await loadReportByDate(pickerDate);
+                             updateStatus(`更新完成：${pickerDate} (共擷取 ${totalFetched} 筆符合條件)`, 'success');
                          } else {
-                             // If we fetched 0 records for the target date
                              if (totalFetched === 0) {
-                                 // Maybe it wasn't found in the top rows?
-                                 // But logic says we scan until we find older.
-                                 // So it implies no data for that date exists (or sort order is wrong in sheet).
                                  updateStatus(`查無 ${pickerDate} 的資料 (或資料過舊)`, 'error');
                              } else {
                                  showToast('所選日期尚無資料');
@@ -1405,23 +1363,21 @@
                          }
                     }
                     
-                    if (activeTab !== 'OVERVIEW') {
-                        switchTab('OVERVIEW');
-                    }
+                    if (activeTab !== 'OVERVIEW') switchTab('OVERVIEW');
                 } else {
-                    // Auto Refresh Finalization (and Interactive Read All Final Status)
                     const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天';
-                    const msg = `刷新完成 (範圍: ${rangeLabel}, 共 ${totalFetched} 筆)`;
+                    const msg = `刷新完成 (範圍: ${rangeLabel}, 共更新 ${totalFetched} 筆)`;
                     updateStatus(msg, 'success');
                     showToast(msg);
                     
-                    // Refresh current view if relevant
-                    updateHistoryList();
-                    if (currentReportDate && db[currentReportDate]) {
-                        loadReportByDate(currentReportDate, true); // true = prevent tab switch, just refresh data
+                    await updateHistoryList();
+                    if (currentReportDate && seenDates.has(currentReportDate)) {
+                        await loadReportByDate(currentReportDate, true); 
                     }
-                    if (activeTab === 'ANALYSIS') renderTrendAnalysis();
+                    if (activeTab === 'ANALYSIS') await renderTrendAnalysis();
                 }
+            } catch(e) {
+                updateStatus(`資料儲存失敗，請檢查瀏覽器容量空間。`, 'error');
             }
             
             updateRawPreview();
@@ -1430,11 +1386,7 @@
         // --- RENDER LOGIC ---
         function cleanAuthorName(name) {
             if (!name) return 'Unknown';
-            
-            // 1. 先取後五碼 (兼容舊規則，處理過長的前綴)
             let shortName = name.slice(-5);
-            
-            // 2. 再去除開頭的英文字母 (針對 S網頁陳葳 這類情況)
             return shortName.replace(/^[a-zA-Z]+/, '');
         }
         
@@ -1466,7 +1418,6 @@
             
             renderDynamicFilterButtons(uniqueGroups);
 
-            // New: Toggle QA Link Button
             const btnQa = document.getElementById('btnQaLink');
             if (btnQa) {
                 if (activeFilterGroup === '品檢') {
@@ -1570,7 +1521,6 @@
                 let width = Math.min((u.totalHours / 12) * 100, 100);
                 
                 const shortName = cleanAuthorName(u.name);
-                // 修改：取消顯示副組名，以確保名字能完整顯示
                 const displayLabel = shortName;
                 const safeName = u.name.replace(/'/g, "\\'");
 
@@ -1926,7 +1876,6 @@
             showToast('名稱已更新');
         }
 
-        // Renamed/Refactored legacy function to use new confirm flow inside delete buttons above, but kept structure if needed
         function executeDeleteRule() {
             // This is now handled by the callback in showConfirmDialog
         }
@@ -2177,7 +2126,6 @@
 
         function toggleProjectSelection(name) {
             if (analysisMode === 'PROJECT') {
-                // FIXED: Set flag to false on manual toggle to respect user selection
                 shouldSelectAllProjects = false;
                 
                 const isAllSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
@@ -2202,7 +2150,6 @@
 
         function togglePersonSelection(name) {
             if (analysisMode === 'PERSON') {
-                // FIXED: Set flag to false on manual toggle
                 shouldSelectAllPersons = false; 
                 
                 const isAllSelected = (selectedPersons.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
@@ -2225,7 +2172,8 @@
             }
         }
 
-        function renderTrendAnalysis() {
+        // 改寫為 Async 函數：使用 IndexedDB 動態撈取特定日期的資料，不需把整年份讀進記憶體
+        async function renderTrendAnalysis() {
             const hintBox = document.getElementById('trendFilterHint');
             const hintText = document.getElementById('trendFilterText');
             
@@ -2236,18 +2184,13 @@
                 hintBox.classList.add('hidden');
             }
 
-            const db = getDB();
             const daysToAnalyze = parseInt(document.getElementById('analysisDays').value) || 7;
-            
-            // --- NEW: MONTHLY AGGREGATION LOGIC (Point 2) ---
-            const isMonthlyMode = daysToAnalyze > 30; // Threshold for switching to monthly view
+            const isMonthlyMode = daysToAnalyze > 30; 
             
             const today = new Date();
-            const labels = []; // X-axis labels (Dates or Months)
+            const labels = []; 
             
             if (isMonthlyMode) {
-                // Generate last N months labels (YYYY-MM)
-                // daysToAnalyze = 90 -> approx 3 months, 180 -> 6, 365 -> 12
                 const monthsCount = Math.round(daysToAnalyze / 30);
                 for(let i=monthsCount-1; i>=0; i--) {
                     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -2256,7 +2199,6 @@
                     labels.push(`${year}-${month}`);
                 }
             } else {
-                // Generate daily labels
                 for(let i=daysToAnalyze-1; i>=0; i--) {
                     const d = new Date();
                     d.setDate(today.getDate() - i);
@@ -2264,39 +2206,51 @@
                 }
             }
 
-            const aggregated = {}; // { Label: { Entity: Hours } }
+            // Client 端讀取優化：只去資料庫裡要符合 labels (月份或日期) 的 Data
+            const allAvailableDates = await getAvailableDates();
+            const datesToLoad = allAvailableDates.filter(dateKey => {
+                if (isMonthlyMode) {
+                    return labels.includes(dateKey.substring(0, 7));
+                } else {
+                    return labels.includes(dateKey);
+                }
+            });
+
+            const dbData = {};
+            await Promise.all(datesToLoad.map(async dateKey => {
+                dbData[dateKey] = await getReportData(dateKey);
+            }));
+
+            const aggregated = {}; 
             const allEntities = new Set(); 
             const entityTotals = {}; 
             const personGroups = {}; 
-            const rowStats = {}; // For Avg calculation
+            const rowStats = {}; 
 
-            // Initialize aggregation buckets
             labels.forEach(lbl => {
                 aggregated[lbl] = {};
                 rowStats[lbl] = { totalHours: 0, uniqueAuthors: new Set() };
             });
 
-            // Iterate over all DB data keys (YYYY-MM-DD)
-            Object.keys(db).forEach(dateKey => {
-                if (!db[dateKey] || !db[dateKey].rows) return;
+            // Iterate over only the fetched local db buffer
+            Object.keys(dbData).forEach(dateKey => {
+                if (!dbData[dateKey] || !dbData[dateKey].rows) return;
                 
                 let targetLabel = null;
                 
                 if (isMonthlyMode) {
-                    // Check if this date belongs to one of our target months
-                    const dKeyMonth = dateKey.substring(0, 7); // "YYYY-MM"
+                    const dKeyMonth = dateKey.substring(0, 7); 
                     if (labels.includes(dKeyMonth)) {
                         targetLabel = dKeyMonth;
                     }
                 } else {
-                    // Exact match for daily mode
                     if (labels.includes(dateKey)) {
                         targetLabel = dateKey;
                     }
                 }
 
                 if (targetLabel) {
-                    db[dateKey].rows.forEach(row => {
+                    dbData[dateKey].rows.forEach(row => {
                         let key = '';
                         let isRelevantForGroupStats = false;
 
@@ -2316,7 +2270,6 @@
                         
                         const val = row.hours;
                         
-                        // Accumulate
                         aggregated[targetLabel][key] = (aggregated[targetLabel][key] || 0) + val;
                         
                         allEntities.add(key);
@@ -2340,8 +2293,6 @@
                 const shouldSelectAll = isProjectMode ? shouldSelectAllProjects : shouldSelectAllPersons;
                 const btnReset = isProjectMode ? document.getElementById('btnResetProject') : document.getElementById('btnResetPerson');
 
-                // FIXED: Don't disable flag here. Rely on toggle function to disable it.
-                // This ensures "All" selection persists across date range changes.
                 if (shouldSelectAll && entitiesArr.length > 0) {
                     entitiesArr.forEach(p => selectedSet.add(p));
                 }
@@ -2419,7 +2370,7 @@
             const datasets = entitiesArr.map((entity, i) => {
                 return {
                     label: entity,
-                    data: labels.map(lbl => aggregated[lbl][entity] || 0), // Use labels array
+                    data: labels.map(lbl => aggregated[lbl][entity] || 0), 
                     backgroundColor: getColor(i),
                     stack: isStacked ? 'Stack 0' : undefined, 
                 };
@@ -2561,15 +2512,14 @@
             table.innerHTML = html;
         }
 
-        // Added missing Date/History functions
-        function loadReportByDate(date, preventTabSwitch = false) {
+        // 改為 Async
+        async function loadReportByDate(date, preventTabSwitch = false) {
             currentReportDate = date;
             const picker = document.getElementById('reportDatePicker');
             if(picker) picker.value = date;
-            updateHistoryList();
+            await updateHistoryList();
 
-            const db = getDB();
-            let data = db[date];
+            const data = await getReportData(date);
 
             if (!data) {
                 currentDailyData.rows = [];
@@ -2585,7 +2535,7 @@
                 if (activeTab === 'OVERVIEW') {
                     renderData();
                 } else if (activeTab === 'ANALYSIS') {
-                    renderTrendAnalysis();
+                    await renderTrendAnalysis();
                 }
             } else {
                 if (currentDailyData.rows.length > 0) switchTab('OVERVIEW');
@@ -2593,7 +2543,7 @@
             }
         }
 
-        function switchToPreviousDay() {
+        async function switchToPreviousDay() {
             const currentDate = currentReportDate;
             const dateObj = new Date(currentDate + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() - 1); 
@@ -2603,11 +2553,11 @@
             const day = String(dateObj.getDate()).padStart(2, '0');
             const prevDayISO = `${year}-${month}-${day}`;
             
-            loadReportByDate(prevDayISO);
+            await loadReportByDate(prevDayISO);
             showToast(`已切換至前日 (${prevDayISO})`);
         }
 
-        function switchToNextDay() {
+        async function switchToNextDay() {
             const currentDate = currentReportDate;
             const dateObj = new Date(currentDate + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
@@ -2617,27 +2567,18 @@
             const day = String(dateObj.getDate()).padStart(2, '0');
             const nextDayISO = `${year}-${month}-${day}`;
             
-            loadReportByDate(nextDayISO);
+            await loadReportByDate(nextDayISO);
             showToast(`已切換至後日 (${nextDayISO})`);
         }
 
-        function handleDateChange() {
+        async function handleDateChange() {
             const newDate = document.getElementById('reportDatePicker').value;
-            if(newDate) loadReportByDate(newDate);
+            if(newDate) await loadReportByDate(newDate);
         }
 
-        function saveCurrentReport() {
-            const date = document.getElementById('reportDatePicker').value;
-            if(!date) return showToast('請選擇日期');
-            const db = getDB();
-            db[date] = currentDailyData;
-            saveDB(db);
-            showToast('資料已儲存');
-        }
-
-        function updateHistoryList() {
-            const db = getDB();
-            const dates = Object.keys(db).sort().reverse(); 
+        // 改為 async
+        async function updateHistoryList() {
+            const dates = await getAvailableDates();
             const listEl = document.getElementById('historyList');
             listEl.innerHTML = '';
             if(dates.length === 0) {
