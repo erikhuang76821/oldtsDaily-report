@@ -960,8 +960,8 @@
             await loadReportByDate(today);
 
             // --- 預設自動刷新邏輯開始 ---
-            fetchGoogleSheetData('3');
-            startAutoRefresh(10, '3');
+            fetchGoogleSheetData('4');
+            startAutoRefresh(10, '4');
             // --- 預設自動刷新邏輯結束 ---
 
             const scrollContainer = document.getElementById('scrollContainer');
@@ -1029,7 +1029,7 @@
             badge.innerHTML = `<i class="fa-solid fa-circle-play mr-1"></i> 每 ${minutes} 分鐘刷新`;
 
             let rangeLabel = '全部';
-            if (range === '3') rangeLabel = '近3天';
+            if (range === '4') rangeLabel = '近4天';
             if (range === '7') rangeLabel = '近7天';
             if (range === '30') rangeLabel = '近1月';
 
