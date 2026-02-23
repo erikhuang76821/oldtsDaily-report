@@ -1,148 +1,134 @@
-團隊日報管理系統 (Google Sheet 直讀版)
+# 團隊日報管理系統 (Google Sheet 版)
 
-這是一個輕量級、純前端的單頁應用程式 (SPA)，專為團隊設計，用於將 Google Sheets 上的流水帳日報資料，轉換為視覺化的儀表板、工時統計與專案分析圖表。
+一個輕量級的單頁應用程式 (SPA)，直接連結 Google Sheets 作為資料來源，提供團隊工時統計、專案分析與趨勢追蹤功能。
 
-無需架設後端伺服器，直接在瀏覽器中運行，透過 Google Visualization API 讀取公開的試算表資料。
+---
 
-🚀 主要功能
+## 功能特色
 
-1. 儀表板 (Overview)
+| 功能 | 說明 |
+|------|------|
+| 📊 **總覽儀表板** | 自動彙整每日工時，依人員分組顯示（低於 8hr 警示 / 超過 10hr 提醒） |
+| 🔍 **群組篩選** | 依組別動態篩選，快速切換檢視不同團隊 |
+| 📁 **專案統計** | 圓餅圖 + 表格呈現專案工時佔比，支援合併同質專案 |
+| 📈 **趨勢分析** | 可切換日/月模式的長期工時趨勢圖表與表格 |
+| ⚙️ **設定管理** | 匯入/匯出合併規則 (JSON)，自訂專案與組別對應 |
+| 🔄 **自動更新** | 可設定 3/7/30 天範圍的自動刷新排程 |
+| 💾 **離線快取** | 使用 IndexedDB (localForage) 儲存歷史資料，離線可用 |
 
-視覺化統計:
+---
 
-人員工時圖: 自動計算每人當日總工時，並依時數顯示不同顏色警示 (不足 8hr 黃色 / 超過 10hr 紅色)。
+## 技術棧
 
-專案佔比圖: 動態圓餅圖展示各專案投入的時間比例。
+### 前端框架
 
-詳細清單:
+| 技術 | 版本 | 用途 |
+|------|------|------|
+| **HTML5** | - | 單檔應用結構 |
+| **Tailwind CSS** | CDN | 響應式 UI 樣式 |
+| **Font Awesome** | 6.4.0 | 圖示庫 |
+| **Chart.js** | CDN (latest) | 圓餅圖 + 長條圖 |
+| **localForage** | 1.10.0 | IndexedDB 封裝，離線資料快取 |
 
-依人員分組展示工作項目。
+### 資料來源
 
-支援摺疊/展開詳細內容。
+| 技術 | 說明 |
+|------|------|
+| **Google Visualization API** | 透過 `gviz/tq` 端點查詢 Google Sheet 資料 |
+| **CORS Proxy** | 備援策略：corsproxy.io / allorigins.win |
 
-關鍵字高亮: 自動標記「測試內容」、「工作事項」等關鍵字。
+### 測試框架
 
-外部連結: 支援顯示議題連結按鈕 (如 Jira/Redmine)。
+| 技術 | 版本 | 用途 |
+|------|------|------|
+| **Vitest** | 4.x | 單元測試執行器 |
+| **jsdom** | - | 瀏覽器環境模擬 |
 
-篩選功能: 可依據組別 (如：網頁、技術、品檢...) 快速篩選顯示人員。
+### 安全防護
 
-2. 資料來源設定 (Data Source)
+| 防護措施 | 說明 |
+|----------|------|
+| **Content Security Policy (CSP)** | `<meta>` 標籤限制腳本/樣式/字型/連線來源 |
+| **XSS 防護** | `escapeHtml()` 轉義所有外部資料的 HTML 特殊字元 |
+| **URL 消毒** | `sanitizeUrl()` 只允許 http/https 協定 |
+| **屬性消毒** | `sanitizeAttr()` 移除 onclick 等屬性中的危險字元 |
+| **Prototype Pollution 防護** | `stripDangerousKeys()` 阻擋 `__proto__`/`constructor` 注入 |
+| **Tabnabbing 防護** | 所有 `target="_blank"` 加上 `rel="noopener noreferrer"` |
 
-彈性欄位對應: 可自定義 Google Sheet 中各欄位 (日期、姓名、專案、內容、工時、連結等) 的索引位置 (Index)，適應不同格式的試算表。
+### 資料清洗 (Data Cleansing)
 
-即時預覽: 提供讀取後的原始 JSON 資料預覽，方便除錯。
+| 清洗項目 | 處理方式 |
+|----------|----------|
+| 人名正規化 | 全形空白/括號轉半形，壓縮連續空白 |
+| 工時範圍限制 | `Math.max(0, Math.min(val, 24))` |
+| 空專案名 | 預設為「未分類」 |
+| 內容前後空行 | 移除前後多餘換行 |
+| 議題 ID 正規化 | 移除前導 `#` 字元 |
+| 連結消毒 | 入庫時即用 `sanitizeUrl()` 過濾 |
 
-3. 控制台與合併規則 (Settings)
+---
 
-專案合併: 可在前端將多個細碎的專案名稱 (例如: "App維護", "App新功能") 設定合併為單一項目 (例如: "App專案") 進行圓餅圖統計，不影響原始資料。
+## 專案結構
 
-組別別名: 設定原始資料中的組別名稱如何對應到系統的顯示分類。
+```
+oldtsDaily-report/
+├── index.html              # 主應用程式（單檔 SPA）
+├── package.json            # npm 專案設定
+├── vitest.config.js        # Vitest 測試設定
+└── src/
+    ├── logic.js            # 抽離的商業邏輯函式
+    ├── logic.test.js       # 商業邏輯測試 (63 tests)
+    ├── security.js         # 安全工具函式模組
+    └── security.test.js    # 安全漏洞測試 (57 tests)
+```
 
-4. 歷史紀錄與備份
+---
 
-本地暫存: 瀏覽過的日期資料會自動儲存於瀏覽器 LocalStorage，下次查看無需重新讀取。
+## 快速開始
 
-資料備份: 支援將所有歷史資料匯出為 JSON 檔案，或從 JSON 還原。
+### 1. 使用應用程式
 
-日期導航: 支援快速切換前一日/後一日。
+直接在瀏覽器開啟 `index.html`，填入 Google Sheet ID 即可使用。
 
-🛠️ 技術架構
+### 2. 執行測試
 
-本專案採用純 HTML/JS/CSS 開發，無任何建置流程 (No Build Step)，直接開啟 index.html 即可使用。
+```bash
+# 安裝依賴
+npm install
 
-核心語言: HTML5, JavaScript (ES6+)
+# 執行全部 120 個測試
+npm test
+```
 
-樣式框架: Tailwind CSS (透過 CDN 引入)
+---
 
-圖表套件: Chart.js (透過 CDN 引入)
+## 測試涵蓋範圍
 
-圖示套件: Font Awesome
+| 測試類別 | 數量 | 涵蓋內容 |
+|----------|------|----------|
+| **商業邏輯** | 63 | getColLetter、cleanGroupName、cleanAuthorName、getUserId、formatContent、getColor、deduplicateAndSortDates、parseGlobalSettings、isValidSettingsData、buildMergedProjectRules、parseSheetDate |
+| **安全防護** | 57 | XSS 注入偵測、URL 消毒、Prototype Pollution、Schema 驗證、靜態 HTML 掃描 |
+| **合計** | **120** | ✅ 全部通過 |
 
-資料串接: Google Sheets Visualization API (gviz/tq)
+---
 
-支援直接讀取或透過 CORS Proxy (corsproxy.io, allorigins.win) 讀取。
+## Google Sheet 欄位對應
 
-📖 使用說明
+| 欄位索引 (預設) | 欄位名稱 | 說明 |
+|----------------|----------|------|
+| 0 | 日期 | 日報日期 |
+| 2 | 姓名 | 填報人員 |
+| 3 | 專案 | 專案名稱 |
+| 4 | 議題 ID | Redmine / Issue ID |
+| 5 | 工作內容 | 當日工作描述 |
+| 6 | 工時 | 小時數 |
+| 7 | 連結 | 相關連結 |
+| 8 | 組別 | 所屬團隊 |
 
-1. 準備 Google Sheet
+> 欄位索引可在「資料來源」頁籤中自訂調整。
 
-建立一個 Google Sheet，並建議包含以下欄位 (順序可自訂)：
+---
 
-日期 (Date)
+## 授權
 
-組別 (Group)
-
-姓名 (Name)
-
-專案名稱 (Project)
-
-議題編號 (Issue ID)
-
-工作內容 (Content)
-
-工時 (Hours)
-
-連結 (Link) - 選填
-
-重要: 請將該 Google Sheet 的共用權限設定為 「知道連結者皆可檢視」 (Anyone with the link can view)。
-
-2. 啟動系統
-
-下載或 Clone 本專案。
-
-雙擊 index.html 在瀏覽器中開啟。
-
-3. 設定連結
-
-點擊上方的 「資料來源」 (Source) 頁籤。
-
-在 Google Sheet ID 欄位輸入試算表 ID (位於網址 .../d/ 與 /edit 之間的字串)。
-
-在下方 欄位對應區塊，輸入各欄位在 Excel 中的索引值 (A欄=0, B欄=1, C欄=2... 以此類推)。
-
-選擇上方日期，點擊 「讀取資料」。
-
-📂 檔案結構
-
-.
-└── index.html  # 包含所有邏輯、樣式與結構的單一檔案
-
-
-⚠️ 注意事項
-
-本系統僅供讀取 (Read-only)，不會修改您的 Google Sheet 內容。
-
-資料儲存於個別瀏覽器的 LocalStorage 中，清除瀏覽器快取會遺失歷史紀錄 (建議定期使用匯出功能備份)。
-
-
-
-
-##  time auto refresh ver
-資料來源設定介面：新增了「自動刷新間隔 (分鐘)」的設定欄位。
-
-核心邏輯：
-
-在 globalSettings 中新增 autoRefreshInterval 參數。
-
-新增 setupAutoRefresh() 函式來管理計時器。
-
-修改 fetchAllData()，在點擊「儲存設定並同步資料」時，會一併儲存刷新時間設定並重啟計時器。
-
-在 switchTab('SOURCE') 時，會自動讀取目前的設定值填入輸入框。
-
-現在，只要在該欄位輸入大於 0 的數字並點擊同步按鈕，系統就會依據設定的時間間隔自動抓取最新資料。
-
-
-Gemini 說了
-為了要能夠在 Client 端穩定儲存超過 1 年的資料，並且兼顧讀取效能，我們必須將底層的暫存機制從 localStorage 升級為 IndexedDB。
-
-為什麼要做這個升級？
-打破 5MB 容量限制：localStorage 每個網域大約只有 5MB 的限制，一年份的日報很快就會塞爆並觸發 QuotaExceededError（這也是舊版會強制刪除舊資料的原因）。升級到 IndexedDB 後，容量限制通常可以達到數百 MB 甚至 GB 以上。
-
-大幅優化讀取效能 (Client 讀取優化)：舊版將所有日期的資料塞在同一個 JSON 物件中，代表每次切換畫面或更新時，系統都要 JSON.parse 數十萬字的字串。優化後，我們將**「每一天的資料拆分成獨立的 Key」**，系統只有在需要（例如點擊某一天，或跑趨勢分析）時，才會去載入那一天的資料，記憶體佔用與讀取速度都會大幅提升。
-
-引入了 localforage 這個極輕量且穩定的套件來簡化 IndexedDB 的操作，並且寫入了無痛轉移機制（自動將舊有 localStorage 的資料搬移到新資料庫並清除舊緩存）。
-
-
-
- 
+MIT License
