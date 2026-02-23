@@ -1,0 +1,25 @@
+{
+  "name": "oldtsdaily-report",
+  "version": "1.0.0",
+  "description": "團隊日報管理系統 (Google Sheet 直讀版)",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erikhuang76821/oldtsDaily-report.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/erikhuang76821/oldtsDaily-report/issues"
+  },
+  "homepage": "https://github.com/erikhuang76821/oldtsDaily-report#readme",
+  "devDependencies": {
+    "jsdom": "^28.1.0",
+    "vitest": "^4.0.18"
+  }
+}

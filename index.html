@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://docs.google.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; font-src https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' https://docs.google.com;">
     <title>團隊日報管理系統 (GS版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -88,10 +91,13 @@
 
     </style>
 </head>
+
 <body class="bg-slate-100 h-screen overflow-hidden text-slate-800 flex">
 
     <!-- Sidebar: History & Tools -->
-    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20 hidden md:flex transition-all duration-300" id="mainSidebar">
+    <aside
+        class="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 shadow-lg z-20 hidden md:flex transition-all duration-300"
+        id="mainSidebar">
         <div class="p-4 border-b border-slate-100 flex justify-between items-center">
             <div>
                 <h1 class="font-bold text-lg text-slate-800 flex items-center gap-2">
@@ -104,14 +110,18 @@
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
-        
+
         <div class="p-3 flex gap-2">
             <!-- Updated button for switching to previous day -->
-            <button onclick="switchToPreviousDay()" class="flex-1 bg-corp-600 hover:bg-corp-800 text-white py-2 px-3 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2" title="前一天">
+            <button onclick="switchToPreviousDay()"
+                class="flex-1 bg-corp-600 hover:bg-corp-800 text-white py-2 px-3 rounded-lg shadow text-sm font-bold transition flex items-center justify-center gap-2"
+                title="前一天">
                 <i class="fa-solid fa-chevron-left"></i> 切換到前日
             </button>
             <!-- New button for next day -->
-            <button onclick="switchToNextDay()" class="w-10 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg shadow-sm text-sm font-bold transition flex items-center justify-center" title="後一天">
+            <button onclick="switchToNextDay()"
+                class="w-10 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2 rounded-lg shadow-sm text-sm font-bold transition flex items-center justify-center"
+                title="後一天">
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
         </div>
@@ -127,10 +137,12 @@
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full" id="mainContentScroll">
-        
+
         <!-- Toolbar Header -->
-        <header class="bg-white border-b border-slate-200 p-3 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm z-10 shrink-0 gap-4 md:gap-0">
-            <div class="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 custom-scroll no-scrollbar">
+        <header
+            class="bg-white border-b border-slate-200 p-3 md:p-4 flex flex-col md:flex-row justify-between items-start md:items-center shadow-sm z-10 shrink-0 gap-4 md:gap-0">
+            <div
+                class="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 custom-scroll no-scrollbar">
                 <!-- Mobile Menu Toggle -->
                 <button onclick="toggleSidebar()" class="md:hidden text-slate-500 hover:text-slate-800 p-1">
                     <i class="fa-solid fa-bars text-lg"></i>
@@ -139,7 +151,9 @@
                 <!-- Date Picker -->
                 <div class="flex flex-col mr-2 shrink-0">
                     <label class="text-[10px] text-slate-400 font-bold uppercase leading-none mb-1">日報日期</label>
-                    <input type="date" id="reportDatePicker" class="font-bold text-base text-slate-800 bg-transparent border-none p-0 focus:ring-0 cursor-pointer h-6 w-32" onchange="handleDateChange()">
+                    <input type="date" id="reportDatePicker"
+                        class="font-bold text-base text-slate-800 bg-transparent border-none p-0 focus:ring-0 cursor-pointer h-6 w-32"
+                        onchange="handleDateChange()">
                 </div>
 
                 <div class="hidden md:block h-8 w-px bg-slate-200 mx-2 shrink-0"></div>
@@ -164,11 +178,13 @@
 
             <!-- Right Actions -->
             <div class="flex items-center gap-3 w-full md:w-auto justify-end mt-2 md:mt-0 shrink-0">
-                <div id="headerTotalManHours" class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full font-bold whitespace-nowrap">
+                <div id="headerTotalManHours"
+                    class="text-xs bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full font-bold whitespace-nowrap">
                     尚未計算
                 </div>
                 <!-- Updated button to handle combined Fetch/Save -->
-                <button onclick="handleHeaderAction()" class="bg-corp-600 hover:bg-corp-800 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow transition flex items-center gap-2">
+                <button onclick="handleHeaderAction()"
+                    class="bg-corp-600 hover:bg-corp-800 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow transition flex items-center gap-2">
                     <i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>
                 </button>
             </div>
@@ -176,47 +192,54 @@
 
         <!-- Scrollable Content Area -->
         <div class="flex-1 overflow-y-auto custom-scroll p-4 md:p-8 space-y-6 bg-slate-50" id="scrollContainer">
-            
+
             <!-- Source Settings Tab (Hidden by default) -->
             <section id="sourceSection" class="hidden max-w-4xl mx-auto space-y-6">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <h2 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
                         <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
-                             <i class="fa-brands fa-google-drive"></i>
+                            <i class="fa-brands fa-google-drive"></i>
                         </span>
                         Google Sheet 來源設定
                     </h2>
-                    
+
                     <div class="space-y-4">
                         <div class="grid grid-cols-1 gap-4">
                             <div>
-                                <label class="block text-sm font-bold text-slate-600 mb-1">Google Sheet ID (試算表 ID)</label>
+                                <label class="block text-sm font-bold text-slate-600 mb-1">Google Sheet ID (試算表
+                                    ID)</label>
                                 <div class="flex gap-2">
-                                    <input type="text" id="gsheetId" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50" placeholder="輸入ID">
+                                    <input type="text" id="gsheetId"
+                                        class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-green-600 transition bg-slate-50"
+                                        placeholder="輸入ID">
                                 </div>
                             </div>
                         </div>
-                        
+
                         <p class="text-xs text-slate-400">
                             <i class="fa-solid fa-circle-info mr-1"></i>
                             請確保試算表權限已設為「知道連結者皆可檢視」，系統將透過公開模式讀取。
                         </p>
 
                         <!-- FEATURE 1: Auto Refresh Setting Block (Updated) -->
-                        <div class="bg-blue-50/50 rounded-lg p-4 border border-blue-100 flex flex-col md:flex-row items-center gap-4">
+                        <div
+                            class="bg-blue-50/50 rounded-lg p-4 border border-blue-100 flex flex-col md:flex-row items-center gap-4">
                             <div class="flex items-center gap-2">
                                 <!-- Removed Alarm Clock Icon -->
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <!-- 預設勾選 (checked) -->
-                                    <input type="checkbox" id="chkAutoRefreshToggle" class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" onchange="toggleAutoRefreshPanel()" checked>
+                                    <input type="checkbox" id="chkAutoRefreshToggle"
+                                        class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                        onchange="toggleAutoRefreshPanel()" checked>
                                     <span class="text-sm font-bold text-slate-700">自動刷新設定</span>
                                 </label>
                             </div>
-                            
+
                             <!-- 預設顯示 (移除 hidden) -->
                             <div id="autoRefreshConfigPanel" class="flex flex-1 flex flex-wrap items-center gap-2">
                                 <span class="text-xs text-slate-500 ml-2">範圍:</span>
-                                <select id="selAutoRefreshRange" class="border border-slate-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none cursor-pointer bg-white">
+                                <select id="selAutoRefreshRange"
+                                    class="border border-slate-300 rounded px-2 py-1 text-sm focus:border-blue-500 focus:outline-none cursor-pointer bg-white">
                                     <option value="4" selected>近 4 天</option>
                                     <option value="7">近 7 天</option>
                                     <option value="30">近 1 個月</option>
@@ -225,16 +248,19 @@
 
                                 <span class="text-xs text-slate-500 ml-2">每隔</span>
                                 <!-- 預設 10 分鐘 -->
-                                <input type="number" id="inpAutoRefreshMinutes" value="10" min="1" class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-blue-500 focus:outline-none">
+                                <input type="number" id="inpAutoRefreshMinutes" value="10" min="1"
+                                    class="w-16 border border-slate-300 rounded px-2 py-1 text-sm text-center font-mono focus:border-blue-500 focus:outline-none">
                                 <span class="text-xs text-slate-500">分鐘</span>
-                                
-                                <button onclick="confirmAutoRefresh()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition ml-auto md:ml-0">
+
+                                <button onclick="confirmAutoRefresh()"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition ml-auto md:ml-0">
                                     確定並啟用
                                 </button>
                             </div>
 
                             <div class="ml-auto">
-                                <span id="badgeAutoRefreshStatus" class="text-[10px] font-bold px-2 py-1 rounded border bg-slate-100 text-slate-400 border-slate-200">
+                                <span id="badgeAutoRefreshStatus"
+                                    class="text-[10px] font-bold px-2 py-1 rounded border bg-slate-100 text-slate-400 border-slate-200">
                                     <i class="fa-solid fa-circle-pause mr-1"></i> 未啟用
                                 </span>
                             </div>
@@ -242,53 +268,75 @@
                         <!-- End Feature 1 -->
 
                         <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                            <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">欄位對應 (Column Index: A=0, B=1, C=2...)</h3>
+                            <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">
+                                欄位對應 (Column Index: A=0, B=1, C=2...)</h3>
                             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">日期 (Date)</label>
-                                    <input type="number" id="colDate" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="0">
+                                    <input type="number" id="colDate"
+                                        class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono"
+                                        value="0">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-emerald-600">組別 (Group)</label>
-                                    <input type="number" id="colGroup" class="w-full border border-emerald-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-emerald-50 text-emerald-700" value="8">
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-emerald-600">組別
+                                        (Group)</label>
+                                    <input type="number" id="colGroup"
+                                        class="w-full border border-emerald-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-emerald-50 text-emerald-700"
+                                        value="8">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">填寫者 (Author)</label>
-                                    <input type="number" id="colName" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="2">
+                                    <input type="number" id="colName"
+                                        class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono"
+                                        value="2">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">專案 (Project)</label>
-                                    <input type="number" id="colProj" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="3">
+                                    <input type="number" id="colProj"
+                                        class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono"
+                                        value="3">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">議題 (Issue)</label>
-                                    <input type="number" id="colId" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="4">
+                                    <input type="number" id="colId"
+                                        class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono"
+                                        value="4">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">回應 (Response)</label>
-                                    <input type="number" id="colContent" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="5">
+                                    <input type="number" id="colContent"
+                                        class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono"
+                                        value="5">
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">小時 (Hours)</label>
-                                    <input type="number" id="colHours" class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono" value="6">
+                                    <input type="number" id="colHours"
+                                        class="w-full border rounded px-2 py-1.5 text-sm text-center font-mono"
+                                        value="6">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-indigo-600">連結 (Link)</label>
-                                    <input type="number" id="colLink" class="w-full border border-indigo-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-indigo-50 text-indigo-700" value="7">
+                                    <label class="block text-xs font-bold text-slate-500 mb-1 text-indigo-600">連結
+                                        (Link)</label>
+                                    <input type="number" id="colLink"
+                                        class="w-full border border-indigo-200 rounded px-2 py-1.5 text-sm text-center font-mono bg-indigo-50 text-indigo-700"
+                                        value="7">
                                 </div>
                             </div>
                         </div>
 
                         <div class="pt-2 flex items-center justify-between gap-4">
                             <div id="gsheetStatusMsg" class="text-sm font-medium mr-auto"></div>
-                            
+
                             <!-- 新增：紅色讀取全部按鈕 (Point 4) -->
-                            <button onclick="openReadAllConfirm()" class="bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-2 transform hover:-translate-y-0.5" title="讀取所有歷史資料">
+                            <button onclick="openReadAllConfirm()"
+                                class="bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center gap-2 transform hover:-translate-y-0.5"
+                                title="讀取所有歷史資料">
                                 <i class="fa-solid fa-layer-group"></i> <span class="hidden md:inline">讀取全部</span>
                             </button>
 
                             <!-- 修改：讀取當日資料 (Point 3) -->
-                            <button onclick="fetchGoogleSheetData()" id="btnFetchGSheet" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-green-600/20 transition flex items-center gap-2 transform hover:-translate-y-0.5">
+                            <button onclick="fetchGoogleSheetData()" id="btnFetchGSheet"
+                                class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-green-600/20 transition flex items-center gap-2 transform hover:-translate-y-0.5">
                                 <i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料
                             </button>
                         </div>
@@ -297,11 +345,14 @@
 
                 <!-- Raw Data Preview (Debug) -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                      <div class="flex justify-between items-center mb-2">
+                    <div class="flex justify-between items-center mb-2">
                         <h3 class="font-bold text-slate-500 text-sm">原始資料預覽 (Debug)</h3>
-                        <span id="rawDataCount" class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">0 筆資料</span>
-                      </div>
-                      <textarea id="rawJsonPreview" class="w-full h-32 p-3 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-500 resize-none focus:outline-none" readonly placeholder="讀取後的資料將顯示於此..."></textarea>
+                        <span id="rawDataCount" class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">0
+                            筆資料</span>
+                    </div>
+                    <textarea id="rawJsonPreview"
+                        class="w-full h-32 p-3 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50 text-slate-500 resize-none focus:outline-none"
+                        readonly placeholder="讀取後的資料將顯示於此..."></textarea>
                 </div>
             </section>
 
@@ -310,28 +361,35 @@
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <h2 class="font-bold text-slate-700 text-lg flex items-center gap-2">
-                            <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
-                                 <i class="fa-solid fa-chart-line"></i>
+                            <span
+                                class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                                <i class="fa-solid fa-chart-line"></i>
                             </span>
                             趨勢分析
                         </h2>
-                        
+
                         <!-- Controls -->
                         <div class="flex flex-wrap gap-3 items-center">
                             <div class="flex bg-slate-100 p-1 rounded-lg">
-                                <button onclick="setAnalysisMode('PROJECT')" id="btnModeProject" class="px-3 py-1.5 text-xs font-bold rounded-md transition bg-white text-corp-600 shadow-sm">專案視角</button>
-                                <button onclick="setAnalysisMode('PERSON')" id="btnModePerson" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">人員比對</button>
-                                <button onclick="setAnalysisMode('GROUP')" id="btnModeGroup" class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">組別視角</button>
+                                <button onclick="setAnalysisMode('PROJECT')" id="btnModeProject"
+                                    class="px-3 py-1.5 text-xs font-bold rounded-md transition bg-white text-corp-600 shadow-sm">專案視角</button>
+                                <button onclick="setAnalysisMode('PERSON')" id="btnModePerson"
+                                    class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">人員比對</button>
+                                <button onclick="setAnalysisMode('GROUP')" id="btnModeGroup"
+                                    class="px-3 py-1.5 text-xs font-bold rounded-md transition text-slate-500 hover:text-slate-700">組別視角</button>
                             </div>
                             <!-- Reset Buttons (Dynamically shown) -->
-                            <button id="btnResetPerson" onclick="resetPersonSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition">
+                            <button id="btnResetPerson" onclick="resetPersonSelection()"
+                                class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition">
                                 <i class="fa-solid fa-rotate-left mr-1"></i> 重置人員全選
                             </button>
-                            <button id="btnResetProject" onclick="resetProjectSelection()" class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition">
+                            <button id="btnResetProject" onclick="resetProjectSelection()"
+                                class="hidden px-3 py-1.5 text-xs font-bold rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition">
                                 <i class="fa-solid fa-rotate-left mr-1"></i> 重置專案全選
                             </button>
-                            
-                            <select id="analysisDays" onchange="renderTrendAnalysis()" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:border-corp-600 cursor-pointer">
+
+                            <select id="analysisDays" onchange="renderTrendAnalysis()"
+                                class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:border-corp-600 cursor-pointer">
                                 <option value="7">最近 7 天</option>
                                 <option value="14">最近 14 天</option>
                                 <option value="30">最近 30 天</option>
@@ -343,9 +401,11 @@
                     </div>
 
                     <!-- Filter Hint (Group Focus only now, Project and Person use comparison UI) -->
-                    <div id="trendFilterHint" class="hidden mb-4 bg-corp-50 border border-corp-100 text-corp-800 px-4 py-2 rounded-lg text-sm flex justify-between items-center">
+                    <div id="trendFilterHint"
+                        class="hidden mb-4 bg-corp-50 border border-corp-100 text-corp-800 px-4 py-2 rounded-lg text-sm flex justify-between items-center">
                         <span id="trendFilterText" class="font-bold"></span>
-                        <button onclick="clearTrendFilter()" class="text-xs bg-white border border-corp-200 hover:bg-corp-100 px-3 py-1 rounded text-corp-600 transition">
+                        <button onclick="clearTrendFilter()"
+                            class="text-xs bg-white border border-corp-200 hover:bg-corp-100 px-3 py-1 rounded text-corp-600 transition">
                             <i class="fa-solid fa-xmark mr-1"></i> 取消聚焦
                         </button>
                     </div>
@@ -359,19 +419,22 @@
                     <div id="entitySelectionArea" class="hidden mb-6 space-y-3">
                         <!-- Selected list hidden as requested -->
                         <div id="selectedEntityContainer" class="hidden"></div>
-                        
+
                         <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                            <h4 id="entitySelectionTitle" class="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
+                            <h4 id="entitySelectionTitle"
+                                class="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
                                 <i class="fa-solid fa-plus-circle"></i> 點擊加入比對
                             </h4>
-                            <div id="unselectedEntityContainer" class="flex flex-col gap-3 max-h-48 overflow-y-auto custom-scroll p-1">
+                            <div id="unselectedEntityContainer"
+                                class="flex flex-col gap-3 max-h-48 overflow-y-auto custom-scroll p-1">
                                 <!-- Populated by JS -->
                             </div>
                         </div>
                     </div>
 
                     <!-- Legend/Summary Hint -->
-                    <div id="chartLegendHint" class="bg-orange-50 border border-orange-100 rounded-lg p-3 text-xs text-orange-800 mb-6 flex items-start gap-2">
+                    <div id="chartLegendHint"
+                        class="bg-orange-50 border border-orange-100 rounded-lg p-3 text-xs text-orange-800 mb-6 flex items-start gap-2">
                         <i class="fa-solid fa-lightbulb mt-0.5"></i>
                         <p>此圖表顯示所選期間內的工時堆疊變化。點擊圖表中的「長條圖區塊」可操作聚焦或移除。</p>
                     </div>
@@ -391,36 +454,45 @@
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                         <h2 class="font-bold text-slate-700 text-lg flex items-center gap-2">
-                            <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <span
+                                class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
                                 <i class="fa-solid fa-sliders"></i>
                             </span>
                             控制台 (全局設定)
                         </h2>
                         <div class="flex gap-2">
-                            <button onclick="exportSettings()" class="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                            <button onclick="exportSettings()"
+                                class="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
                                 <i class="fa-solid fa-download"></i> 匯出設定
                             </button>
-                            <label class="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1 cursor-pointer">
+                            <label
+                                class="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1 cursor-pointer">
                                 <i class="fa-solid fa-upload"></i> 匯入設定
-                                <input type="file" id="importSettingsFile" class="hidden" onchange="importSettings(this)" accept=".json">
+                                <input type="file" id="importSettingsFile" class="hidden"
+                                    onchange="importSettings(this)" accept=".json">
                             </label>
                         </div>
                     </div>
-                    
+
                     <!-- 1. Source Flexibility Settings (Group Merges) - NEW -->
                     <div class="space-y-4 mb-8">
-                        <div class="flex flex-col md:flex-row justify-between md:items-end pb-2 border-b border-slate-100 gap-2">
-                             <div>
-                                 <h3 class="font-bold text-slate-600 text-sm">來源彈性設定 (組別合併)</h3>
-                                 <p class="text-xs text-slate-400">設定 Google Sheet 原始組別名稱如何對應到系統顯示的組別。</p>
-                             </div>
+                        <div
+                            class="flex flex-col md:flex-row justify-between md:items-end pb-2 border-b border-slate-100 gap-2">
+                            <div>
+                                <h3 class="font-bold text-slate-600 text-sm">來源彈性設定 (組別合併)</h3>
+                                <p class="text-xs text-slate-400">設定 Google Sheet 原始組別名稱如何對應到系統顯示的組別。</p>
+                            </div>
                         </div>
 
                         <!-- Add New Group Rule Form -->
-                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col md:flex-row gap-2 items-start md:items-center">
-                            <input type="text" id="newGroupAlias" placeholder="顯示名稱 (如: 網頁)" class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:w-1/4 focus:outline-none focus:border-indigo-500">
-                            <input type="text" id="newGroupSources" placeholder="原始名稱 (逗號分隔, 如: 網頁組,網頁)" class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:flex-1 focus:outline-none focus:border-indigo-500">
-                            <button onclick="addGroupRule()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm whitespace-nowrap w-full md:w-auto">
+                        <div
+                            class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col md:flex-row gap-2 items-start md:items-center">
+                            <input type="text" id="newGroupAlias" placeholder="顯示名稱 (如: 網頁)"
+                                class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:w-1/4 focus:outline-none focus:border-indigo-500">
+                            <input type="text" id="newGroupSources" placeholder="原始名稱 (逗號分隔, 如: 網頁組,網頁)"
+                                class="border border-slate-300 rounded px-2 py-1.5 text-sm w-full md:flex-1 focus:outline-none focus:border-indigo-500">
+                            <button onclick="addGroupRule()"
+                                class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm whitespace-nowrap w-full md:w-auto">
                                 <i class="fa-solid fa-plus"></i> 新增
                             </button>
                         </div>
@@ -433,18 +505,19 @@
                     <!-- 2. Project Merge Rules List -->
                     <div class="space-y-4">
                         <div class="flex justify-between items-end pb-2 border-b border-slate-100">
-                             <div>
-                                 <h3 class="font-bold text-slate-600 text-sm">專案合併規則</h3>
-                                 <p class="text-xs text-slate-400">這些規則會自動將多個專案名稱合併為一個，影響工時統計圖表。</p>
-                             </div>
+                            <div>
+                                <h3 class="font-bold text-slate-600 text-sm">專案合併規則</h3>
+                                <p class="text-xs text-slate-400">這些規則會自動將多個專案名稱合併為一個，影響工時統計圖表。</p>
+                            </div>
                         </div>
 
                         <div id="mergeRulesContainer" class="space-y-2">
                             <!-- Populated by JS -->
                         </div>
 
-                        <div id="noRulesMsg" class="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                             尚未設定合併規則。<br>請至「總覽報表」的圓餅圖區塊勾選專案進行合併。
+                        <div id="noRulesMsg"
+                            class="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                            尚未設定合併規則。<br>請至「總覽報表」的圓餅圖區塊勾選專案進行合併。
                         </div>
                     </div>
                 </div>
@@ -459,14 +532,15 @@
                 </div>
 
                 <!-- Anchor for Result -->
-                <a id="resultAnchor"></a> 
-                
+                <a id="resultAnchor"></a>
+
                 <!-- Detail List (Re-ordered to TOP) -->
                 <div id="resultSection" class="hidden space-y-4 mt-2"> <!-- Reduced top margin to mt-2 -->
-                    
+
                     <!-- Header with Filter Buttons (Point 2 & 3) -->
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-2 gap-2">
-                        
+                    <div
+                        class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-2 gap-2">
+
                         <!-- Left side flow: Heading + Filters -->
                         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                             <h3 class="font-bold text-slate-700 text-lg flex items-center gap-2 shrink-0">
@@ -481,10 +555,13 @@
                         <!-- Right side: Actions -->
                         <div class="flex items-center gap-2 shrink-0">
                             <!-- New Button for QA Project (Visible only in '品檢' filter) -->
-                            <a href="https://erikhuang76821.github.io/QA_project/" target="_blank" id="btnQaLink" class="hidden text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap transform hover:-translate-y-0.5 items-center gap-2 decoration-0">
+                            <a href="https://erikhuang76821.github.io/QA_project/" target="_blank"
+                                rel="noopener noreferrer" id="btnQaLink"
+                                class="hidden text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap transform hover:-translate-y-0.5 items-center gap-2 decoration-0">
                                 <i class="fa-solid fa-briefcase"></i> 案件管理
                             </a>
-                            <button onclick="scrollToAnalysis()" class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap transform hover:-translate-y-0.5">
+                            <button onclick="scrollToAnalysis()"
+                                class="text-xs bg-corp-600 hover:bg-corp-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm whitespace-nowrap transform hover:-translate-y-0.5">
                                 <i class="fa-solid fa-chart-column mr-1"></i> 工時統計
                             </button>
                         </div>
@@ -494,21 +571,24 @@
 
                 <!-- Dashboard Widgets (Re-ordered to BOTTOM, Full Width) -->
                 <!-- Anchor for scrolling -->
-                <a id="analysisAnchor"></a> 
+                <a id="analysisAnchor"></a>
                 <div id="analysisSection" class="hidden mt-6 space-y-6"> <!-- Added space-y-6 for separation -->
-                    
+
                     <!-- Work Hours Chart (Bar) -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col w-full">
                         <h3 class="font-bold text-slate-700 mb-4 flex items-center">
-                            <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-2">
+                            <span
+                                class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mr-2">
                                 <i class="fa-solid fa-clock"></i>
                             </span>
                             工時統計
-                            <span id="widgetTotalManHours" class="ml-auto text-xs bg-slate-100 px-2 py-1 rounded-full font-normal text-slate-500"></span>
+                            <span id="widgetTotalManHours"
+                                class="ml-auto text-xs bg-slate-100 px-2 py-1 rounded-full font-normal text-slate-500"></span>
                         </h3>
-                        
+
                         <!-- 2-Column Grid Layout for Names -->
-                        <div id="hoursGridContainer" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto custom-scroll max-h-[500px]">
+                        <div id="hoursGridContainer"
+                            class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto custom-scroll max-h-[500px]">
                             <!-- Populated via JS -->
                         </div>
                     </div>
@@ -517,46 +597,53 @@
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col w-full">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-2">
                             <h3 class="font-bold text-slate-700 flex items-center">
-                                <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-2">
+                                <span
+                                    class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-2">
                                     <i class="fa-solid fa-chart-pie"></i>
                                 </span>
                                 專案工時佔比
                             </h3>
                             <div class="flex gap-2" id="mergeTools">
                                 <!-- Dynamic Buttons -->
-                                <button id="btnCancelMerge" onclick="cancelMergeMode()" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                <button id="btnCancelMerge" onclick="cancelMergeMode()"
+                                    class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-600 px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
                                     <i class="fa-solid fa-xmark"></i> 取消
                                 </button>
-                                <button id="btnMergeAction" onclick="handleMergeButtonClick()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
+                                <button id="btnMergeAction" onclick="handleMergeButtonClick()"
+                                    class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded transition font-bold shadow-sm flex items-center gap-1">
                                     <i class="fa-solid fa-object-group"></i> <span>合併設定</span>
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div class="flex flex-col md:flex-row gap-8 items-start">
                             <!-- Chart Side -->
                             <div class="w-full md:w-1/3 relative h-56 flex items-center justify-center shrink-0">
                                 <canvas id="projectPieChart"></canvas>
                             </div>
-                            
+
                             <!-- Table Side -->
                             <div class="w-full md:w-2/3 overflow-x-auto">
-                                 <table class="w-full text-sm text-left text-slate-600">
-                                     <thead class="text-xs text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
-                                         <tr>
-                                             <th id="thCheckbox" class="px-3 py-2 w-8 text-center hidden">
-                                                <input type="checkbox" onclick="toggleAllProjectCheckboxes(this)" class="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
-                                             </th>
-                                             <th class="px-3 py-2">專案 (包含合併項目)</th>
-                                             <th class="px-3 py-2 text-right">工時</th>
-                                             <th class="px-3 py-2 text-right">比例</th>
-                                         </tr>
-                                     </thead>
-                                     <tbody id="projectTableBody" class="divide-y divide-slate-100">
-                                         <!-- Populated by JS -->
-                                     </tbody>
-                                 </table>
-                                 <p id="mergeHint" class="hidden text-[10px] text-slate-400 mt-2 text-right text-indigo-600 font-bold bg-indigo-50 inline-block px-2 py-1 rounded ml-auto w-full md:w-auto">* 請勾選上方項目並點擊「合併選取項目」</p>
+                                <table class="w-full text-sm text-left text-slate-600">
+                                    <thead
+                                        class="text-xs text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th id="thCheckbox" class="px-3 py-2 w-8 text-center hidden">
+                                                <input type="checkbox" onclick="toggleAllProjectCheckboxes(this)"
+                                                    class="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                                            </th>
+                                            <th class="px-3 py-2">專案 (包含合併項目)</th>
+                                            <th class="px-3 py-2 text-right">工時</th>
+                                            <th class="px-3 py-2 text-right">比例</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="projectTableBody" class="divide-y divide-slate-100">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                                <p id="mergeHint"
+                                    class="hidden text-[10px] text-slate-400 mt-2 text-right text-indigo-600 font-bold bg-indigo-50 inline-block px-2 py-1 rounded ml-auto w-full md:w-auto">
+                                    * 請勾選上方項目並點擊「合併選取項目」</p>
                             </div>
                         </div>
                     </div>
@@ -579,19 +666,24 @@
             <div class="p-6 space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">合併後的名稱</label>
-                    <input type="text" id="mergeNameInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition" placeholder="請輸入名稱">
+                    <input type="text" id="mergeNameInput"
+                        class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition"
+                        placeholder="請輸入名稱">
                 </div>
-                
+
                 <div class="bg-slate-50 rounded p-3 text-xs text-slate-600">
                     <p class="font-bold mb-1 text-slate-500">即將合併以下項目：</p>
-                    <ul id="mergeListPreview" class="list-disc list-inside space-y-1 text-slate-500 max-h-32 overflow-y-auto">
+                    <ul id="mergeListPreview"
+                        class="list-disc list-inside space-y-1 text-slate-500 max-h-32 overflow-y-auto">
                         <!-- Items -->
                     </ul>
                 </div>
             </div>
             <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
-                <button onclick="closeMergeDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
-                <button onclick="confirmMerge()" class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">確認合併</button>
+                <button onclick="closeMergeDialog()"
+                    class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="confirmMerge()"
+                    class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">確認合併</button>
             </div>
         </div>
     </div>
@@ -600,14 +692,17 @@
     <div id="confirmDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
             <div class="p-6 text-center">
-                <div class="w-12 h-12 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-4" id="confirmIconContainer">
+                <div class="w-12 h-12 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-4"
+                    id="confirmIconContainer">
                     <i class="fa-solid fa-circle-question text-xl"></i>
                 </div>
                 <h3 class="font-bold text-slate-700 text-lg mb-2" id="confirmTitle">確認操作</h3>
                 <p class="text-sm text-slate-500 mb-6" id="confirmMessage">確定要執行此操作嗎？</p>
                 <div class="flex gap-3 justify-center">
-                    <button onclick="closeConfirmDialog()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition flex-1">取消</button>
-                    <button onclick="executeConfirm()" id="confirmActionBtn" class="px-4 py-2 rounded-lg text-sm font-bold bg-corp-600 text-white hover:bg-corp-700 transition flex-1 shadow-lg shadow-corp-200">確認</button>
+                    <button onclick="closeConfirmDialog()"
+                        class="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-100 transition flex-1">取消</button>
+                    <button onclick="executeConfirm()" id="confirmActionBtn"
+                        class="px-4 py-2 rounded-lg text-sm font-bold bg-corp-600 text-white hover:bg-corp-700 transition flex-1 shadow-lg shadow-corp-200">確認</button>
                 </div>
             </div>
         </div>
@@ -624,17 +719,21 @@
             </div>
             <div class="p-6">
                 <label class="block text-xs font-bold text-slate-500 mb-1">合併後的顯示名稱</label>
-                <input type="text" id="editAliasInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition">
+                <input type="text" id="editAliasInput"
+                    class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition">
             </div>
             <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
-                <button onclick="closeEditDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
-                <button onclick="saveEditedProjectRule()" class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">儲存</button>
+                <button onclick="closeEditDialog()"
+                    class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="saveEditedProjectRule()"
+                    class="px-4 py-2 rounded text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">儲存</button>
             </div>
         </div>
     </div>
 
     <!-- Edit Group Rule Modal (New) -->
-    <div id="editGroupDialogOverlay" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
+    <div id="editGroupDialogOverlay"
+        class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-[scale-in_0.2s_ease-out]">
             <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
                 <h3 class="font-bold text-slate-700">編輯來源規則</h3>
@@ -645,28 +744,36 @@
             <div class="p-6 space-y-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">顯示名稱 (Alias)</label>
-                    <input type="text" id="editGroupAliasInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition">
+                    <input type="text" id="editGroupAliasInput"
+                        class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">原始名稱 (逗號分隔)</label>
-                    <input type="text" id="editGroupSourcesInput" class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition">
+                    <input type="text" id="editGroupSourcesInput"
+                        class="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 transition">
                 </div>
             </div>
             <div class="bg-slate-50 p-4 flex justify-end gap-2 border-t border-slate-100">
-                <button onclick="closeEditGroupDialog()" class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
-                <button onclick="saveEditedGroupRule()" class="px-4 py-2 rounded text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">儲存</button>
+                <button onclick="closeEditGroupDialog()"
+                    class="px-4 py-2 rounded text-sm font-bold text-slate-500 hover:bg-slate-200 transition">取消</button>
+                <button onclick="saveEditedGroupRule()"
+                    class="px-4 py-2 rounded text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">儲存</button>
             </div>
         </div>
     </div>
 
     <!-- Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
+    <div id="toast"
+        class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    </div>
 
     <!-- Floating Buttons Container (FEATURE 2) -->
-    <button onclick="scrollToResult()" id="backToResultBtn" class="fixed bottom-24 right-5 md:bottom-24 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5 hidden">
+    <button onclick="scrollToResult()" id="backToResultBtn"
+        class="fixed bottom-24 right-5 md:bottom-24 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 opacity-0 transform translate-y-5 hidden">
         <i class="fa-solid fa-arrow-up text-xl"></i>
     </button>
-    <button onclick="scrollToAnalysis()" id="goToAnalysisBtn" class="fixed bottom-5 right-5 md:bottom-5 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 transform translate-y-0 hidden">
+    <button onclick="scrollToAnalysis()" id="goToAnalysisBtn"
+        class="fixed bottom-5 right-5 md:bottom-5 md:right-10 bg-corp-600 hover:bg-corp-800 text-white w-12 h-12 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center z-50 transform translate-y-0 hidden">
         <i class="fa-solid fa-arrow-down text-xl"></i>
     </button>
 
@@ -687,7 +794,7 @@
         const DATES_KEY = 'daily_report_dates_v1';
         const OLD_DB_KEY = 'daily_reports_db_v6_gs_clean'; // 用於無痛升級
         const SETTINGS_KEY = 'daily_reports_settings_v1';
-        
+
         localforage.config({
             name: 'DailyReportSystem',
             storeName: 'reports_data'
@@ -714,7 +821,7 @@
         async function saveBulkData(dbBufferObj) {
             let existingDates = await getAvailableDates();
             let changed = false;
-            
+
             const promises = [];
             for (const [date, data] of Object.entries(dbBufferObj)) {
                 promises.push(localforage.setItem(DB_PREFIX + date, data));
@@ -724,7 +831,7 @@
                 }
             }
             await Promise.all(promises);
-            
+
             if (changed) {
                 await saveAvailableDates(existingDates);
             }
@@ -748,73 +855,110 @@
 
         // --- STATE MANAGER ---
         let currentReportDate = '';
-        let projectChartInstance = null; 
-        let trendChartInstance = null; 
-        let isMergeMode = false; 
-        
-        let ruleToDeleteIndex = -1; 
-        let ruleToEditIndex = -1; 
-        let ruleToEditGroupIndex = -1; 
-        let deleteType = ''; 
-        let onConfirmAction = null; 
+        let projectChartInstance = null;
+        let trendChartInstance = null;
+        let isMergeMode = false;
 
-        let autoRefreshTimer = null; 
-        
+        let ruleToDeleteIndex = -1;
+        let ruleToEditIndex = -1;
+        let ruleToEditGroupIndex = -1;
+        let deleteType = '';
+        let onConfirmAction = null;
+
+        let autoRefreshTimer = null;
+
         // Analysis State
-        let analysisMode = 'PROJECT'; 
-        let activeTrendFilter = null; 
-        let selectedPersons = new Set(); 
-        let shouldSelectAllPersons = false; 
-        
-        let selectedProjects = new Set(); 
-        let shouldSelectAllProjects = true; 
+        let analysisMode = 'PROJECT';
+        let activeTrendFilter = null;
+        let selectedPersons = new Set();
+        let shouldSelectAllPersons = false;
 
-        let currentTotalEntitiesCount = 0; 
-        
+        let selectedProjects = new Set();
+        let shouldSelectAllProjects = true;
+
+        let currentTotalEntitiesCount = 0;
+
         // Data Model (目前顯示的這天)
         let currentDailyData = {
             config: {
                 sheetId: '168G3AtI3lIdgIv6q75Fz9BtM_u11yC1G-cz1NTJApbo',
-                cols: { date: 0, group: 8, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 } 
+                cols: { date: 0, group: 8, name: 2, proj: 3, id: 4, content: 5, hours: 6, link: 7 }
             },
             rows: []
         };
-        
+
         const DEFAULT_GROUP_MERGES = [
-            { alias: '品檢', originals: ['品檢組', '品檢','品檢_早班','品檢_中班','品檢_緯創'] },
+            { alias: '品檢', originals: ['品檢組', '品檢', '品檢_早班', '品檢_中班', '品檢_緯創'] },
             { alias: '技術', originals: ['技術', '技術組'] },
-            { alias: '網頁系統', originals: ['網頁系統_前端', '網頁系統_後端','網頁系統','網頁系統_實習生','網頁系統_外包','網頁系統_緯創'] },
-            { alias: '資料庫', originals: ['資料庫組', '資料庫','資料庫_智能行銷'] },
+            { alias: '網頁系統', originals: ['網頁系統_前端', '網頁系統_後端', '網頁系統', '網頁系統_實習生', '網頁系統_外包', '網頁系統_緯創'] },
+            { alias: '資料庫', originals: ['資料庫組', '資料庫', '資料庫_智能行銷'] },
             { alias: '資源整合應用', originals: ['資源整合應用_自動化', '資源整合應用_企劃'] },
-            { alias: '客服', originals: ['客服組', '【客服組】','客服_VIP','客服_值班者'] }
+            { alias: '客服', originals: ['客服組', '【客服組】', '客服_VIP', '客服_值班者'] }
         ];
 
         let globalSettings = {
             projectMerges: [],
             groupMerges: []
         };
-        
-        let activeTab = 'OVERVIEW'; 
-        let activeFilterGroup = 'ALL'; 
+
+        let activeTab = 'OVERVIEW';
+        let activeFilterGroup = 'ALL';
 
         const CHART_COLORS = [
-            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', 
+            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
             '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#14b8a6',
             '#f43f5e', '#a855f7', '#0ea5e9', '#22c55e', '#eab308'
         ];
         function getColor(index) { return CHART_COLORS[index % CHART_COLORS.length]; }
 
+        // --- Security Utility Functions ---
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;')
+                .replace(/`/g, '&#96;')
+                .replace(/\//g, '&#x2F;');
+        }
+
+        function sanitizeUrl(url) {
+            if (!url) return '';
+            url = String(url).trim();
+            if (!/^https?:\/\//i.test(url)) return '';
+            if (/[<>"'`]/.test(url)) return '';
+            return url;
+        }
+
+        function sanitizeAttr(str) {
+            if (!str) return '';
+            return String(str).replace(/[<>"'&`]/g, '');
+        }
+
+        function stripDangerousKeys(obj) {
+            if (obj === null || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) return obj.map(stripDangerousKeys);
+            const clean = {};
+            for (const key of Object.keys(obj)) {
+                if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+                clean[key] = stripDangerousKeys(obj[key]);
+            }
+            return clean;
+        }
+
         // Initialize (改為 Async)
         document.addEventListener('DOMContentLoaded', async () => {
             loadGlobalSettings();
-            
+
             // 執行資料庫轉移
             await migrateOldData();
 
             const today = new Date().toISOString().split('T')[0];
             await updateHistoryList();
             await loadReportByDate(today);
-            
+
             // --- 預設自動刷新邏輯開始 ---
             fetchGoogleSheetData('3');
             startAutoRefresh(10, '3');
@@ -825,12 +969,12 @@
                 scrollContainer.addEventListener('scroll', handleScroll);
                 handleScroll();
             }
-            
+
             if (currentDailyData.rows.length === 0) {
                 switchTab('SOURCE');
             }
-            
-            setAnalysisMode('PROJECT'); 
+
+            setAnalysisMode('PROJECT');
         });
 
         // --- GLOBAL SETTINGS ---
@@ -848,7 +992,7 @@
 
         function saveGlobalSettings() {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(globalSettings));
-            renderSettingsTab(); 
+            renderSettingsTab();
         }
 
         // --- FEATURE 1: AUTO REFRESH LOGIC ---
@@ -868,33 +1012,33 @@
         function confirmAutoRefresh() {
             const mins = parseInt(document.getElementById('inpAutoRefreshMinutes').value);
             const range = document.getElementById('selAutoRefreshRange').value;
-            
+
             if (!mins || mins < 1) {
                 showToast('請輸入有效的分鐘數 (至少 1 分鐘)');
                 return;
             }
-            
+
             startAutoRefresh(mins, range);
         }
 
         function startAutoRefresh(minutes, range) {
-            stopAutoRefresh(); 
-            
+            stopAutoRefresh();
+
             const badge = document.getElementById('badgeAutoRefreshStatus');
             badge.className = "text-[10px] font-bold px-2 py-1 rounded border bg-green-100 text-green-600 border-green-200 animate-pulse";
             badge.innerHTML = `<i class="fa-solid fa-circle-play mr-1"></i> 每 ${minutes} 分鐘刷新`;
-            
+
             let rangeLabel = '全部';
             if (range === '3') rangeLabel = '近3天';
             if (range === '7') rangeLabel = '近7天';
             if (range === '30') rangeLabel = '近1月';
-            
+
             showToast(`已啟用自動刷新 (每 ${minutes} 分鐘, 範圍: ${rangeLabel})`);
-            
+
             autoRefreshTimer = setInterval(() => {
                 const id = document.getElementById('gsheetId').value;
-                if(id) {
-                    fetchGoogleSheetData(range); 
+                if (id) {
+                    fetchGoogleSheetData(range);
                 }
             }, minutes * 60 * 1000);
         }
@@ -912,9 +1056,9 @@
         // --- SCROLL LISTENERS & ACTIONS ---
         function handleScroll() {
             const scrollContainer = document.getElementById('scrollContainer');
-            const upBtn = document.getElementById('backToResultBtn'); 
-            const downBtn = document.getElementById('goToAnalysisBtn'); 
-            
+            const upBtn = document.getElementById('backToResultBtn');
+            const downBtn = document.getElementById('goToAnalysisBtn');
+
             if (!scrollContainer) return;
 
             if (activeTab !== 'OVERVIEW') return;
@@ -924,7 +1068,7 @@
             const clientHeight = scrollContainer.clientHeight;
 
             if (scrollTop > 400) {
-                upBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); 
+                upBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden');
                 upBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
                 upBtn.classList.remove('opacity-100', 'translate-y-0');
@@ -933,19 +1077,19 @@
 
             const isNearBottom = (scrollHeight - scrollTop - clientHeight) < 200;
             if (scrollHeight > clientHeight + 100 && !isNearBottom) {
-                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden'); 
+                downBtn.classList.remove('opacity-0', 'translate-y-5', 'hidden');
                 downBtn.classList.add('opacity-100', 'translate-y-0');
             } else {
                 downBtn.classList.remove('opacity-100', 'translate-y-0');
                 downBtn.classList.add('opacity-0', 'translate-y-5');
             }
         }
-        
+
         function scrollToResult() {
             const anchor = document.getElementById('resultAnchor');
             if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
         }
-        
+
         function scrollToAnalysis() {
             const anchor = document.getElementById('analysisAnchor');
             if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
@@ -982,8 +1126,8 @@
 
             document.querySelectorAll('.header-tab-btn').forEach(btn => btn.classList.remove('active'));
             const tabBtn = document.getElementById(`tab-${tab}`);
-            if(tabBtn) tabBtn.classList.add('active');
-            
+            if (tabBtn) tabBtn.classList.add('active');
+
             const sourceSec = document.getElementById('sourceSection');
             const overviewSec = document.getElementById('overviewSection');
             const settingsSec = document.getElementById('settingsSection');
@@ -999,29 +1143,29 @@
 
             if (tab === 'OVERVIEW') {
                 overviewSec.classList.remove('hidden');
-                renderData(); 
-                upBtn.classList.add('hidden'); 
+                renderData();
+                upBtn.classList.add('hidden');
                 downBtn.classList.add('hidden');
                 setTimeout(handleScroll, 100);
             } else {
                 upBtn.classList.add('hidden');
                 downBtn.classList.add('hidden');
-                
+
                 if (tab === 'ANALYSIS') {
                     analysisSec.classList.remove('hidden');
                     renderTrendAnalysis();
                 } else if (tab === 'SOURCE') {
                     sourceSec.classList.remove('hidden');
                     if (currentDailyData.config && currentDailyData.config.sheetId) {
-                         document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
-                         document.getElementById('colDate').value = currentDailyData.config.cols.date;
-                         document.getElementById('colGroup').value = currentDailyData.config.cols.group;
-                         document.getElementById('colName').value = currentDailyData.config.cols.name;
-                         document.getElementById('colProj').value = currentDailyData.config.cols.proj;
-                         document.getElementById('colId').value = currentDailyData.config.cols.id;
-                         document.getElementById('colContent').value = currentDailyData.config.cols.content;
-                         document.getElementById('colHours').value = currentDailyData.config.cols.hours;
-                         document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
+                        document.getElementById('gsheetId').value = currentDailyData.config.sheetId || '';
+                        document.getElementById('colDate').value = currentDailyData.config.cols.date;
+                        document.getElementById('colGroup').value = currentDailyData.config.cols.group;
+                        document.getElementById('colName').value = currentDailyData.config.cols.name;
+                        document.getElementById('colProj').value = currentDailyData.config.cols.proj;
+                        document.getElementById('colId').value = currentDailyData.config.cols.id;
+                        document.getElementById('colContent').value = currentDailyData.config.cols.content;
+                        document.getElementById('colHours').value = currentDailyData.config.cols.hours;
+                        document.getElementById('colLink').value = (currentDailyData.config.cols.link !== undefined) ? currentDailyData.config.cols.link : 7;
                     }
                     updateRawPreview();
                 } else if (tab === 'SETTINGS') {
@@ -1034,7 +1178,7 @@
         function updateRawPreview() {
             const ta = document.getElementById('rawJsonPreview');
             const countSpan = document.getElementById('rawDataCount');
-            if(currentDailyData.rows && currentDailyData.rows.length > 0) {
+            if (currentDailyData.rows && currentDailyData.rows.length > 0) {
                 ta.value = JSON.stringify(currentDailyData.rows, null, 2);
                 countSpan.innerText = `${currentDailyData.rows.length} 筆資料`;
             } else {
@@ -1081,10 +1225,10 @@
         function showConfirmDialog(title, message, onConfirm, isDelete = false) {
             document.getElementById('confirmTitle').innerText = title;
             document.getElementById('confirmMessage').innerText = message;
-            
+
             const btn = document.getElementById('confirmActionBtn');
             const iconContainer = document.getElementById('confirmIconContainer');
-            
+
             if (isDelete) {
                 btn.className = "px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 text-white hover:bg-rose-700 transition flex-1 shadow-lg shadow-rose-200";
                 iconContainer.className = "w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4";
@@ -1113,10 +1257,10 @@
 
         function openReadAllConfirm() {
             showConfirmDialog(
-                '確認讀取全部資料', 
+                '確認讀取全部資料',
                 '即將重新讀取 Google Sheet 上的所有歷史資料。若資料量較大可能會需要一點時間，確定要繼續嗎？',
                 () => {
-                    fetchGoogleSheetData('ALL', true); 
+                    fetchGoogleSheetData('ALL', true);
                 },
                 false
             );
@@ -1127,10 +1271,10 @@
         async function fetchGoogleSheetData(autoRefreshRange = null, isInteractiveReadAll = false) {
             const sheetId = document.getElementById('gsheetId').value.trim();
             const pickerDate = document.getElementById('reportDatePicker').value;
-            
+
             const btn = document.getElementById('btnFetchGSheet');
             const statusMsg = document.getElementById('gsheetStatusMsg');
-            
+
             statusMsg.className = 'text-sm font-medium';
             statusMsg.innerHTML = '';
 
@@ -1145,10 +1289,10 @@
                 group: parseInt(document.getElementById('colGroup').value) || 8,
                 name: parseInt(document.getElementById('colName').value) || 2,
                 proj: parseInt(document.getElementById('colProj').value) || 3,
-                id:   parseInt(document.getElementById('colId').value) || 4,
+                id: parseInt(document.getElementById('colId').value) || 4,
                 content: parseInt(document.getElementById('colContent').value) || 5,
-                hours:  parseInt(document.getElementById('colHours').value) || 6,
-                link:  parseInt(document.getElementById('colLink').value) || 7
+                hours: parseInt(document.getElementById('colHours').value) || 6,
+                link: parseInt(document.getElementById('colLink').value) || 7
             };
 
             if (!autoRefreshRange) {
@@ -1167,29 +1311,29 @@
             const BATCH_SIZE = 2500;
             let offset = 0;
             let hasMore = true;
-            let totalFetched = 0; 
-            
+            let totalFetched = 0;
+
             const seenDates = new Set();
             const dbBuffer = {}; // 暫存這次請求所抓取的所有資料
-            
+
             const dateColIndex = parseInt(document.getElementById('colDate').value) || 0;
             const dateColLetter = getColLetter(dateColIndex);
-            
+
             const nameColIndex = parseInt(document.getElementById('colName').value) || 2;
             const nameColLetter = getColLetter(nameColIndex);
 
             let cutoffTime = 0;
-            let manualTargetDateStr = null; 
+            let manualTargetDateStr = null;
 
             const today = new Date();
-            today.setHours(0,0,0,0);
-            
-            if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000); 
+            today.setHours(0, 0, 0, 0);
+
+            if (autoRefreshRange === '3') cutoffTime = today.getTime() - (2 * 86400000);
             else if (autoRefreshRange === '7') cutoffTime = today.getTime() - (6 * 86400000);
             else if (autoRefreshRange === '30') cutoffTime = today.getTime() - (29 * 86400000);
             else if (autoRefreshRange === 'ALL') cutoffTime = 0;
             else if (!autoRefreshRange && pickerDate) {
-                manualTargetDateStr = pickerDate.trim(); 
+                manualTargetDateStr = pickerDate.trim();
             }
 
             const strategies = [
@@ -1202,20 +1346,39 @@
                 const c = row.c;
                 if (!c) return null;
                 const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
-                
-                const name = String(getVal(cols.name)).trim();
+
+                // [Cleansing #2] 正規化全形空白 + 壓縮連續空白
+                // [Cleansing #5] 同一人名微差（全形/半形括號）正規化
+                let name = String(getVal(cols.name))
+                    .replace(/[\u3000\u00A0]/g, ' ')  // 全形空白 → 半形
+                    .replace(/\s+/g, ' ')              // 壓縮連續空白
+                    .replace(/（/g, '(').replace(/）/g, ')')  // 全形括號 → 半形
+                    .trim();
                 if (!name) return null;
 
-                const rawGroupName = String(getVal(cols.group)).trim();
-                const groupName = rawGroupName; 
-                
+                const rawGroupName = String(getVal(cols.group))
+                    .replace(/[\u3000\u00A0]/g, ' ').trim();
+                const groupName = rawGroupName;
+
+                // [Cleansing #3] 空專案名預設為 '未分類'
                 let proj = String(getVal(cols.proj)).trim().replace(/【.*?】/g, '').trim();
-                let idVal = String(getVal(cols.id)).trim();
-                let content = String(getVal(cols.content)).trim();
-                let link = String(getVal(cols.link)).trim();
+                proj = proj || '未分類';
+
+                // [Cleansing #6] 議題ID正規化：移除前導 #
+                let idVal = String(getVal(cols.id)).trim().replace(/^#+/, '');
+
+                // [Cleansing #4] 內容清理：移除前後空行
+                let content = String(getVal(cols.content))
+                    .replace(/^\n+|\n+$/g, '')
+                    .trim();
+
+                // [Cleansing #7] 連結在入庫時即消毒
+                let link = sanitizeUrl(String(getVal(cols.link)).trim());
+
+                // [Cleansing #1] 工時 clamp 0~24，防止極端值
                 const hrsVal = getVal(cols.hours);
-                const hours = parseFloat(hrsVal) || 0;
-                
+                const hours = Math.max(0, Math.min(parseFloat(hrsVal) || 0, 24));
+
                 return {
                     name, group: groupName, project: proj, issue: idVal, content, hours, link
                 };
@@ -1232,7 +1395,7 @@
                         const res = await fetch(fetchUrl);
                         if (!res.ok) throw new Error('Network Error');
                         let text = await res.text();
-                        
+
                         if (strat.wrapper) {
                             const data = JSON.parse(text);
                             text = data.contents;
@@ -1243,9 +1406,9 @@
                         if (start > -1 && end > -1) {
                             successJson = JSON.parse(text.substring(start, end));
                             fetchSuccess = true;
-                            break; 
+                            break;
                         }
-                    } catch(e) {
+                    } catch (e) {
                         console.warn(`GSheet Strat ${strat.name} failed`, e);
                     }
                 }
@@ -1262,7 +1425,7 @@
                 }
 
                 const rows = successJson.table.rows;
-                
+
                 if (rows.length === 0) {
                     hasMore = false;
                     break;
@@ -1271,22 +1434,22 @@
                 let batchProcessedCount = 0;
 
                 for (const row of rows) {
-                    const c = row.c; 
-                    if(!c) continue;
+                    const c = row.c;
+                    if (!c) continue;
                     const getVal = (i) => (c[i] ? (c[i].f || c[i].v) : '');
                     const rowDateStr = getVal(cols.date);
                     if (!rowDateStr) continue;
 
                     let keyDateStr = String(rowDateStr).trim();
                     let dObj;
-                    
+
                     const gsDateMatch = keyDateStr.match(/Date\((\d+),\s*(\d+),\s*(\d+)/);
                     if (gsDateMatch) {
                         dObj = new Date(parseInt(gsDateMatch[1]), parseInt(gsDateMatch[2]), parseInt(gsDateMatch[3]));
                     } else {
                         dObj = new Date(keyDateStr.replace(/-/g, '/'));
                     }
-                    
+
                     if (isNaN(dObj.getTime())) continue;
 
                     const year = dObj.getFullYear();
@@ -1296,7 +1459,7 @@
 
                     if (manualTargetDateStr) {
                         if (rowIsoDate !== manualTargetDateStr) {
-                            continue; 
+                            continue;
                         }
                     } else if (autoRefreshRange !== 'ALL' && autoRefreshRange) {
                         if (dObj.getTime() < cutoffTime) {
@@ -1305,7 +1468,7 @@
                     }
 
                     const parsed = parseRow(row);
-                    if(parsed) {
+                    if (parsed) {
                         if (!seenDates.has(rowIsoDate)) {
                             dbBuffer[rowIsoDate] = { rows: [] };
                             seenDates.add(rowIsoDate);
@@ -1322,7 +1485,7 @@
                     await saveBulkData(dbBuffer);
                     await updateHistoryList();
                     updateStatus(`讀取中... 已擷取 ${totalFetched} 筆符合條件資料`, 'success');
-                    
+
                     if (currentReportDate && seenDates.has(currentReportDate)) {
                         await loadReportByDate(currentReportDate, true);
                     }
@@ -1334,52 +1497,52 @@
                     await new Promise(r => setTimeout(r, 50));
                 }
             }
-            
+
             // 寫入緩衝資料到 IndexedDB
             try {
                 await saveBulkData(dbBuffer);
-                
+
                 if (!autoRefreshRange) {
                     const headerBtn = document.querySelector('[onclick="handleHeaderAction()"]');
                     headerBtn.disabled = false;
                     btn.disabled = false;
                     headerBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> <span class="hidden md:inline">更新</span>';
                     btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 讀取當日資料';
-                    
+
                     if (currentDailyData.rows.length === 0 && !pickerDate) {
-                         const availableDates = await getAvailableDates();
-                         if (availableDates.length > 0) await loadReportByDate(availableDates[0]);
+                        const availableDates = await getAvailableDates();
+                        if (availableDates.length > 0) await loadReportByDate(availableDates[0]);
                     } else if (pickerDate) {
-                         const targetData = await getReportData(pickerDate);
-                         if (targetData && targetData.rows && targetData.rows.length > 0) {
-                             await loadReportByDate(pickerDate);
-                             updateStatus(`更新完成：${pickerDate} (共擷取 ${totalFetched} 筆符合條件)`, 'success');
-                         } else {
-                             if (totalFetched === 0) {
-                                 updateStatus(`查無 ${pickerDate} 的資料 (或資料過舊)`, 'error');
-                             } else {
-                                 showToast('所選日期尚無資料');
-                             }
-                         }
+                        const targetData = await getReportData(pickerDate);
+                        if (targetData && targetData.rows && targetData.rows.length > 0) {
+                            await loadReportByDate(pickerDate);
+                            updateStatus(`更新完成：${pickerDate} (共擷取 ${totalFetched} 筆符合條件)`, 'success');
+                        } else {
+                            if (totalFetched === 0) {
+                                updateStatus(`查無 ${pickerDate} 的資料 (或資料過舊)`, 'error');
+                            } else {
+                                showToast('所選日期尚無資料');
+                            }
+                        }
                     }
-                    
+
                     if (activeTab !== 'OVERVIEW') switchTab('OVERVIEW');
                 } else {
-                    const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近'+autoRefreshRange+'天';
+                    const rangeLabel = autoRefreshRange === 'ALL' ? '全部' : '近' + autoRefreshRange + '天';
                     const msg = `刷新完成 (範圍: ${rangeLabel}, 共更新 ${totalFetched} 筆)`;
                     updateStatus(msg, 'success');
                     showToast(msg);
-                    
+
                     await updateHistoryList();
                     if (currentReportDate && seenDates.has(currentReportDate)) {
-                        await loadReportByDate(currentReportDate, true); 
+                        await loadReportByDate(currentReportDate, true);
                     }
                     if (activeTab === 'ANALYSIS') await renderTrendAnalysis();
                 }
-            } catch(e) {
+            } catch (e) {
                 updateStatus(`資料儲存失敗，請檢查瀏覽器容量空間。`, 'error');
             }
-            
+
             updateRawPreview();
         }
 
@@ -1389,10 +1552,10 @@
             let shortName = name.slice(-5);
             return shortName.replace(/^[a-zA-Z]+/, '');
         }
-        
+
         function renderData() {
             const rawRows = currentDailyData.rows || [];
-            
+
             const analysisSection = document.getElementById('analysisSection');
             const resultSection = document.getElementById('resultSection');
             const emptyState = document.getElementById('emptyState');
@@ -1411,11 +1574,11 @@
             emptyState.classList.add('hidden');
 
             const uniqueGroups = Array.from(new Set(rawRows.map(r => cleanGroupName(r.group)))).sort();
-            
+
             if (activeFilterGroup !== 'ALL' && !uniqueGroups.includes(activeFilterGroup)) {
                 activeFilterGroup = 'ALL';
             }
-            
+
             renderDynamicFilterButtons(uniqueGroups);
 
             const btnQa = document.getElementById('btnQaLink');
@@ -1436,28 +1599,28 @@
                 const dynamicGroup = cleanGroupName(row.group);
 
                 if (!userMap[row.name]) {
-                    userMap[row.name] = { 
-                        name: row.name, 
-                        group: dynamicGroup || '其他', 
-                        originalGroup: row.group || '其他', 
-                        totalHours: 0, 
-                        tasks: [] 
+                    userMap[row.name] = {
+                        name: row.name,
+                        group: dynamicGroup || '其他',
+                        originalGroup: row.group || '其他',
+                        totalHours: 0,
+                        tasks: []
                     };
                 }
-                
+
                 userMap[row.name].totalHours += row.hours;
                 userMap[row.name].tasks.push(row);
                 totalHoursGlobal += row.hours;
             });
 
             const userList = Object.values(userMap);
-            
+
             let filteredUserList = userList;
             if (activeFilterGroup !== 'ALL') {
                 filteredUserList = userList.filter(u => u.group === activeFilterGroup);
             }
 
-            const userCount = userList.length; 
+            const userCount = userList.length;
 
             const statsText = `${userCount}人 / ${totalHoursGlobal.toFixed(1)}hr`;
             document.getElementById('headerTotalManHours').innerText = statsText;
@@ -1491,13 +1654,14 @@
             `;
 
             groups.forEach(group => {
-                if (!group) return; 
+                if (!group) return;
                 const isActive = (activeFilterGroup === group);
+                const safeGroup = sanitizeAttr(group);
                 html += `
                     <button class="filter-btn ${isActive ? 'active' : ''}" 
-                            data-group="${group}" 
-                            onclick="filterByGroup('${group}')">
-                        ${group}
+                            data-group="${safeGroup}" 
+                            onclick="filterByGroup('${safeGroup}')">
+                        ${escapeHtml(group)}
                     </button>
                 `;
             });
@@ -1508,8 +1672,8 @@
         function renderDashboardWidgets(userList) {
             const container = document.getElementById('hoursGridContainer');
             container.innerHTML = '';
-            
-            const sorted = [...userList].sort((a,b) => b.totalHours - a.totalHours);
+
+            const sorted = [...userList].sort((a, b) => b.totalHours - a.totalHours);
 
             let rows = '';
             sorted.forEach(u => {
@@ -1517,16 +1681,16 @@
                 let hoursClass = 'text-emerald-700';
                 if (u.totalHours < 8) { barColor = 'bg-amber-400'; hoursClass = 'text-amber-700'; }
                 else if (u.totalHours > 10) { barColor = 'bg-rose-500'; hoursClass = 'text-rose-700'; }
-                
+
                 let width = Math.min((u.totalHours / 12) * 100, 100);
-                
+
                 const shortName = cleanAuthorName(u.name);
                 const displayLabel = shortName;
-                const safeName = u.name.replace(/'/g, "\\'");
+                const safeName = sanitizeAttr(u.name);
 
                 rows += `
                     <div onclick="scrollToUser('${safeName}')" class="cursor-pointer flex items-center gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition" title="點擊跳轉到工作項目">
-                        <div class="font-bold text-sm text-slate-700 truncate w-32 shrink-0" title="${u.name}">${displayLabel}</div>
+                        <div class="font-bold text-sm text-slate-700 truncate w-32 shrink-0" title="${escapeHtml(u.name)}">${escapeHtml(displayLabel)}</div>
                         <div class="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
                              <div class="${barColor} h-2 rounded-full" style="width: ${width}%"></div>
                         </div>
@@ -1603,10 +1767,10 @@
             const selectedNames = Array.from(checkboxes).map(cb => cb.value);
 
             let actualOriginals = [];
-            
+
             selectedNames.forEach(name => {
                 const existingRuleIndex = globalSettings.projectMerges.findIndex(r => r.alias === name);
-                
+
                 if (existingRuleIndex > -1) {
                     actualOriginals.push(...globalSettings.projectMerges[existingRuleIndex].originals);
                     globalSettings.projectMerges.splice(existingRuleIndex, 1);
@@ -1621,9 +1785,9 @@
             });
 
             saveGlobalSettings();
-            
+
             closeMergeDialog();
-            cancelMergeMode(); 
+            cancelMergeMode();
             showToast('合併成功！可至「控制台」管理規則');
         }
 
@@ -1634,19 +1798,19 @@
                     projectChartInstance.destroy();
                     projectChartInstance = null;
                 }
-                return; 
+                return;
             }
 
             let allTasks = [];
             userList.forEach(u => allTasks.push(...u.tasks));
-            
+
             if (allTasks.length === 0) {
-                 document.getElementById('projectTableBody').innerHTML = '';
-                 if (projectChartInstance) {
-                      projectChartInstance.destroy();
-                      projectChartInstance = null;
-                 }
-                 return;
+                document.getElementById('projectTableBody').innerHTML = '';
+                if (projectChartInstance) {
+                    projectChartInstance.destroy();
+                    projectChartInstance = null;
+                }
+                return;
             }
 
             const counts = {};
@@ -1656,7 +1820,7 @@
                 let p = t.project || '未分類';
                 const mergeRule = globalSettings.projectMerges.find(rule => rule.originals.includes(p));
                 if (mergeRule) {
-                    p = mergeRule.alias; 
+                    p = mergeRule.alias;
                 }
 
                 counts[p] = (counts[p] || 0) + t.hours;
@@ -1675,7 +1839,7 @@
             else thCheckbox.classList.add('hidden');
 
             tbody.innerHTML = dataArr.map((d, i) => {
-                const safeName = d.name.replace(/"/g, '&quot;');
+                const safeName = sanitizeAttr(d.name);
                 return `
                 <tr class="hover:bg-slate-50 border-b border-slate-100 last:border-0 group">
                     <td class="px-3 py-2 text-center ${isMergeMode ? '' : 'hidden'}">
@@ -1683,7 +1847,7 @@
                     </td>
                     <td class="px-3 py-2 font-bold text-slate-700 flex items-center">
                         <span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style="background-color: ${getColor(i)}"></span>
-                        <span class="truncate max-w-[120px]" title="${d.name}">${d.name}</span>
+                        <span class="truncate max-w-[120px]" title="${escapeHtml(d.name)}">${escapeHtml(d.name)}</span>
                     </td>
                     <td class="px-3 py-2 text-right font-mono">${d.hours.toFixed(1)}</td>
                     <td class="px-3 py-2 text-right font-mono text-slate-400">${d.percent}%</td>
@@ -1691,10 +1855,10 @@
             `}).join('');
 
             const ctx = document.getElementById('projectPieChart').getContext('2d');
-            
+
             if (projectChartInstance) {
                 projectChartInstance.destroy();
-                projectChartInstance = null; 
+                projectChartInstance = null;
             }
 
             projectChartInstance = new Chart(ctx, {
@@ -1715,7 +1879,7 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
+                                label: function (context) {
                                     let label = context.label || '';
                                     if (label) label += ': ';
                                     let value = context.parsed.toFixed(1);
@@ -1739,7 +1903,7 @@
         function addGroupRule() {
             const aliasInput = document.getElementById('newGroupAlias');
             const sourceInput = document.getElementById('newGroupSources');
-            
+
             const alias = aliasInput.value.trim();
             const sourcesRaw = sourceInput.value.trim();
 
@@ -1756,7 +1920,7 @@
             });
 
             saveGlobalSettings();
-            
+
             aliasInput.value = '';
             sourceInput.value = '';
             showToast('來源規則已新增');
@@ -1785,10 +1949,10 @@
 
             const aliasInput = document.getElementById('editGroupAliasInput');
             const sourcesInput = document.getElementById('editGroupSourcesInput');
-            
+
             aliasInput.value = rule.alias;
             sourcesInput.value = rule.originals.join(', ');
-            
+
             document.getElementById('editGroupDialogOverlay').classList.remove('hidden');
             aliasInput.focus();
         }
@@ -1800,10 +1964,10 @@
 
         function saveEditedGroupRule() {
             if (ruleToEditGroupIndex === -1) return;
-            
+
             const aliasInput = document.getElementById('editGroupAliasInput');
             const sourcesInput = document.getElementById('editGroupSourcesInput');
-            
+
             const newAlias = aliasInput.value.trim();
             const newSourcesRaw = sourcesInput.value.trim();
 
@@ -1819,7 +1983,7 @@
                 originals: newSources
             };
             saveGlobalSettings();
-            
+
             closeEditGroupDialog();
             renderData();
             showToast('來源規則已更新');
@@ -1848,7 +2012,7 @@
 
             const input = document.getElementById('editAliasInput');
             input.value = rule.alias;
-            
+
             document.getElementById('editDialogOverlay').classList.remove('hidden');
             input.focus();
         }
@@ -1860,19 +2024,19 @@
 
         function saveEditedProjectRule() {
             if (ruleToEditIndex === -1) return;
-            
+
             const input = document.getElementById('editAliasInput');
             const newAlias = input.value.trim();
-            
+
             if (!newAlias) {
                 return showToast('請輸入名稱');
             }
 
             globalSettings.projectMerges[ruleToEditIndex].alias = newAlias;
             saveGlobalSettings();
-            
+
             closeEditDialog();
-            renderData(); 
+            renderData();
             showToast('名稱已更新');
         }
 
@@ -1883,7 +2047,7 @@
         function renderSettingsTab() {
             const projContainer = document.getElementById('mergeRulesContainer');
             const noProjMsg = document.getElementById('noRulesMsg');
-            
+
             if (globalSettings.projectMerges.length === 0) {
                 projContainer.innerHTML = '';
                 noProjMsg.classList.remove('hidden');
@@ -1893,11 +2057,11 @@
                     <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="font-bold text-slate-700">${rule.alias}</span>
+                                <span class="font-bold text-slate-700">${escapeHtml(rule.alias)}</span>
                                 <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">專案合併</span>
                             </div>
                             <div class="text-xs text-slate-400 leading-relaxed break-all">
-                                包含: ${rule.originals.join(', ')}
+                                包含: ${escapeHtml(rule.originals.join(', '))}
                             </div>
                         </div>
                         <div class="flex items-center">
@@ -1917,11 +2081,11 @@
                 <div class="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
                     <div class="flex-1 overflow-hidden">
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="font-bold text-emerald-700">${rule.alias}</span>
+                            <span class="font-bold text-emerald-700">${escapeHtml(rule.alias)}</span>
                             <span class="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">組別</span>
                         </div>
-                        <div class="text-xs text-slate-400 truncate" title="${rule.originals.join(', ')}">
-                            ${rule.originals.join(', ')}
+                        <div class="text-xs text-slate-400 truncate" title="${escapeHtml(rule.originals.join(', '))}">
+                            ${escapeHtml(rule.originals.join(', '))}
                         </div>
                     </div>
                     <div class="flex items-center">
@@ -1939,13 +2103,13 @@
         function renderDetailList(userList) {
             const container = document.getElementById('detailView');
             container.innerHTML = '';
-            
+
             if (userList.length === 0) {
-                 container.innerHTML = `<div class="p-4 text-center text-slate-400 border border-slate-200 rounded-lg bg-white/50"><i class="fa-solid fa-filter text-lg mr-2"></i> 目前篩選條件下無匹配資料。</div>`;
-                 document.getElementById('analysisSection').classList.add('hidden');
-                 return;
+                container.innerHTML = `<div class="p-4 text-center text-slate-400 border border-slate-200 rounded-lg bg-white/50"><i class="fa-solid fa-filter text-lg mr-2"></i> 目前篩選條件下無匹配資料。</div>`;
+                document.getElementById('analysisSection').classList.add('hidden');
+                return;
             }
-            
+
             document.getElementById('analysisSection').classList.remove('hidden');
 
             userList.forEach(u => {
@@ -1955,29 +2119,32 @@
 
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col md:flex-row overflow-hidden mb-2';
-                
+
                 card.id = getUserId(u.name);
 
                 const shortName = cleanAuthorName(u.name);
-                
+
                 let tasksHtml = u.tasks.map(t => {
                     let linkHtml = '';
                     if (t.link && t.link.startsWith('http')) {
-                         linkHtml = `
+                        const safeLink = sanitizeUrl(t.link);
+                        if (safeLink) {
+                            linkHtml = `
                             <div class="mt-2 text-right">
-                                <a href="${t.link}" target="_blank" class="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 hover:text-indigo-800 transition font-bold border border-indigo-100">
+                                <a href="${safeLink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 hover:text-indigo-800 transition font-bold border border-indigo-100">
                                     <i class="fa-solid fa-arrow-up-right-from-square"></i> 開啟連結
                                 </a>
                             </div>
                           `;
+                        }
                     }
 
                     return `
                     <div class="border-b border-slate-100 last:border-0">
                         <button class="accordion-btn w-full text-left p-2 flex items-center justify-between hover:bg-slate-50 transition group focus:outline-none" onclick="toggleTask(this)" aria-expanded="false">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 pr-4">
-                                <span class="text-[10px] text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded border border-slate-100" title="專案">${t.project}</span>
-                                <span class="text-sm font-bold text-slate-700 font-mono" title="議題ID">${t.issue}</span>
+                                <span class="text-[10px] text-slate-500 px-1.5 py-0.5 bg-slate-100 rounded border border-slate-100" title="專案">${escapeHtml(t.project)}</span>
+                                <span class="text-sm font-bold text-slate-700 font-mono" title="議題ID">${escapeHtml(t.issue)}</span>
                                 <span class="text-xs font-bold text-corp-600 font-mono ml-auto md:ml-2" title="時數">: ${t.hours}hr</span>
                             </div>
                             <i class="fa-solid fa-chevron-down text-slate-300 text-xs accordion-icon group-hover:text-corp-600"></i>
@@ -1996,9 +2163,9 @@
                 card.innerHTML = `
                     <div onclick="toggleAllTasks(this)" class="cursor-pointer hover:bg-slate-100 transition p-2 md:w-32 bg-slate-50 md:border-r border-b md:border-b-0 border-slate-200 flex flex-row md:flex-col items-center justify-between md:justify-center gap-1 shrink-0" title="點擊展開/收合所有項目">
                         <div class="flex flex-col items-center">
-                            <div class="text-[10px] text-slate-400 font-bold mb-0.5">${u.originalGroup}</div>
-                            <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap truncate w-full px-1" title="${u.name}">
-                                ${shortName}
+                            <div class="text-[10px] text-slate-400 font-bold mb-0.5">${escapeHtml(u.originalGroup)}</div>
+                            <div class="font-bold text-sm text-slate-800 text-center leading-tight whitespace-nowrap truncate w-full px-1" title="${escapeHtml(u.name)}">
+                                ${escapeHtml(shortName)}
                             </div>
                         </div>
                         <div class="px-2 py-0.5 rounded-full text-[10px] font-bold ${hoursColor} mt-1">${u.totalHours.toFixed(1)}h</div>
@@ -2013,7 +2180,7 @@
             const card = headerEl.parentElement;
             const buttons = card.querySelectorAll('.accordion-btn');
             const contents = card.querySelectorAll('.accordion-content');
-            
+
             const allExpanded = Array.from(buttons).every(btn => btn.getAttribute('aria-expanded') === 'true');
             const newState = !allExpanded;
 
@@ -2025,7 +2192,7 @@
                     else icon.style.transform = 'rotate(0deg)';
                 }
             });
-            
+
             contents.forEach(content => {
                 if (newState) {
                     content.classList.add('expanded', 'p-3', 'pt-0');
@@ -2036,8 +2203,10 @@
         }
 
         function formatContent(text) {
-             if (!text) return '(無內容)';
-             return text.replace(/(測試內容|工作事項|問題回報)/g, '<span class="font-bold text-slate-800">$1</span>');
+            if (!text) return '(無內容)';
+            // 先轉義 HTML 特殊字元，再插入安全的 bold span
+            const safe = escapeHtml(text);
+            return safe.replace(/(測試內容|工作事項|問題回報)/g, '<span class="font-bold text-slate-800">$1</span>');
         }
 
         function toggleTask(btn) {
@@ -2055,18 +2224,18 @@
         // --- TREND ANALYSIS LOGIC (NEW) ---
         function setAnalysisMode(mode) {
             analysisMode = mode;
-            activeTrendFilter = null; 
-            
+            activeTrendFilter = null;
+
             const btnProject = document.getElementById('btnModeProject');
             const btnPerson = document.getElementById('btnModePerson');
             const btnGroup = document.getElementById('btnModeGroup');
-            
+
             const btnResetPerson = document.getElementById('btnResetPerson');
             const btnResetProject = document.getElementById('btnResetProject');
-            
+
             const activeClass = ['bg-white', 'text-corp-600', 'shadow-sm'];
             const inactiveClass = ['text-slate-500', 'hover:text-slate-700'];
-            
+
             [btnProject, btnPerson, btnGroup].forEach(btn => {
                 btn.classList.remove(...activeClass);
                 btn.classList.add(...inactiveClass);
@@ -2079,18 +2248,18 @@
             const entityArea = document.getElementById('entitySelectionArea');
             const chartHint = document.getElementById('chartLegendHint');
             const title = document.getElementById('entitySelectionTitle');
-            
+
             btnResetPerson.classList.add('hidden');
             btnResetProject.classList.add('hidden');
 
             if (mode === 'PERSON') {
                 entityArea.classList.remove('hidden');
-                chartHint.classList.add('hidden'); 
+                chartHint.classList.add('hidden');
                 title.innerHTML = '<i class="fa-solid fa-user-plus"></i> 點擊加入比對 (依組別分類)';
-                shouldSelectAllPersons = true; 
+                shouldSelectAllPersons = true;
             } else if (mode === 'PROJECT') {
                 entityArea.classList.remove('hidden');
-                chartHint.classList.add('hidden'); 
+                chartHint.classList.add('hidden');
                 title.innerHTML = '<i class="fa-solid fa-plus-circle"></i> 點擊加入比對 (專案清單)';
                 shouldSelectAllProjects = true;
             } else {
@@ -2127,16 +2296,16 @@
         function toggleProjectSelection(name) {
             if (analysisMode === 'PROJECT') {
                 shouldSelectAllProjects = false;
-                
+
                 const isAllSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
-                
+
                 if (isAllSelected) {
                     selectedProjects.clear();
                     selectedProjects.add(name);
                 } else {
                     if (selectedProjects.size === 1 && selectedProjects.has(name)) {
                         resetProjectSelection();
-                        return; 
+                        return;
                     }
                     if (selectedProjects.has(name)) {
                         selectedProjects.delete(name);
@@ -2150,17 +2319,17 @@
 
         function togglePersonSelection(name) {
             if (analysisMode === 'PERSON') {
-                shouldSelectAllPersons = false; 
-                
+                shouldSelectAllPersons = false;
+
                 const isAllSelected = (selectedPersons.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
-                
+
                 if (isAllSelected) {
                     selectedPersons.clear();
                     selectedPersons.add(name);
                 } else {
                     if (selectedPersons.size === 1 && selectedPersons.has(name)) {
                         resetPersonSelection();
-                        return; 
+                        return;
                     }
                     if (selectedPersons.has(name)) {
                         selectedPersons.delete(name);
@@ -2176,7 +2345,7 @@
         async function renderTrendAnalysis() {
             const hintBox = document.getElementById('trendFilterHint');
             const hintText = document.getElementById('trendFilterText');
-            
+
             if (analysisMode === 'GROUP' && activeTrendFilter) {
                 hintBox.classList.remove('hidden');
                 hintText.innerText = `目前聚焦：${activeTrendFilter}`;
@@ -2185,21 +2354,21 @@
             }
 
             const daysToAnalyze = parseInt(document.getElementById('analysisDays').value) || 7;
-            const isMonthlyMode = daysToAnalyze > 30; 
-            
+            const isMonthlyMode = daysToAnalyze > 30;
+
             const today = new Date();
-            const labels = []; 
-            
+            const labels = [];
+
             if (isMonthlyMode) {
                 const monthsCount = Math.round(daysToAnalyze / 30);
-                for(let i=monthsCount-1; i>=0; i--) {
+                for (let i = monthsCount - 1; i >= 0; i--) {
                     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
                     const year = d.getFullYear();
                     const month = String(d.getMonth() + 1).padStart(2, '0');
                     labels.push(`${year}-${month}`);
                 }
             } else {
-                for(let i=daysToAnalyze-1; i>=0; i--) {
+                for (let i = daysToAnalyze - 1; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(today.getDate() - i);
                     labels.push(d.toISOString().split('T')[0]);
@@ -2221,11 +2390,11 @@
                 dbData[dateKey] = await getReportData(dateKey);
             }));
 
-            const aggregated = {}; 
-            const allEntities = new Set(); 
-            const entityTotals = {}; 
-            const personGroups = {}; 
-            const rowStats = {}; 
+            const aggregated = {};
+            const allEntities = new Set();
+            const entityTotals = {};
+            const personGroups = {};
+            const rowStats = {};
 
             labels.forEach(lbl => {
                 aggregated[lbl] = {};
@@ -2235,11 +2404,11 @@
             // Iterate over only the fetched local db buffer
             Object.keys(dbData).forEach(dateKey => {
                 if (!dbData[dateKey] || !dbData[dateKey].rows) return;
-                
+
                 let targetLabel = null;
-                
+
                 if (isMonthlyMode) {
-                    const dKeyMonth = dateKey.substring(0, 7); 
+                    const dKeyMonth = dateKey.substring(0, 7);
                     if (labels.includes(dKeyMonth)) {
                         targetLabel = dKeyMonth;
                     }
@@ -2260,18 +2429,18 @@
                             if (mergeRule) key = mergeRule.alias;
                         } else if (analysisMode === 'PERSON') {
                             key = cleanAuthorName(row.name);
-                            personGroups[key] = cleanGroupName(row.group); 
+                            personGroups[key] = cleanGroupName(row.group);
                         } else if (analysisMode === 'GROUP') {
                             key = cleanGroupName(row.group);
                             if (!activeTrendFilter || key === activeTrendFilter) {
                                 isRelevantForGroupStats = true;
                             }
                         }
-                        
+
                         const val = row.hours;
-                        
+
                         aggregated[targetLabel][key] = (aggregated[targetLabel][key] || 0) + val;
-                        
+
                         allEntities.add(key);
                         entityTotals[key] = (entityTotals[key] || 0) + val;
 
@@ -2285,7 +2454,7 @@
 
             let entitiesArr = Array.from(allEntities);
             currentTotalEntitiesCount = entitiesArr.length;
-            entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
+            entitiesArr.sort((a, b) => entityTotals[b] - entityTotals[a]);
 
             if (analysisMode === 'PERSON' || analysisMode === 'PROJECT') {
                 const isProjectMode = (analysisMode === 'PROJECT');
@@ -2311,11 +2480,11 @@
                     if (!selectedSet.has(p)) {
                         let grp = '其他';
                         if (isProjectMode) {
-                            grp = '專案清單'; 
+                            grp = '專案清單';
                         } else {
                             grp = personGroups[p] || '其他';
                         }
-                        
+
                         if (!unselectedByGroup[grp]) unselectedByGroup[grp] = [];
                         unselectedByGroup[grp].push(p);
                     }
@@ -2328,7 +2497,7 @@
                     sortedGroups.forEach(grp => {
                         const groupDiv = document.createElement('div');
                         groupDiv.className = "mb-1";
-                        
+
                         const groupTitle = document.createElement('h5');
                         groupTitle.className = "text-[10px] font-bold text-slate-400 mb-1 ml-1";
                         groupTitle.innerText = grp;
@@ -2336,29 +2505,29 @@
 
                         const btnContainer = document.createElement('div');
                         btnContainer.className = "flex flex-wrap gap-2";
-                        
+
                         unselectedByGroup[grp].forEach(p => {
                             const btn = document.createElement('button');
                             btn.className = "text-[10px] font-medium px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-corp-600 transition flex items-center gap-1 shadow-sm";
-                            btn.innerHTML = `<i class="fa-solid fa-plus text-slate-300"></i> ${p}`;
+                            btn.innerHTML = `<i class="fa-solid fa-plus text-slate-300"></i> ${escapeHtml(p)}`;
                             btn.onclick = () => isProjectMode ? toggleProjectSelection(p) : togglePersonSelection(p);
                             btnContainer.appendChild(btn);
                         });
-                        
+
                         groupDiv.appendChild(btnContainer);
                         unselectedContainer.appendChild(groupDiv);
                     });
                 }
 
                 entitiesArr = Array.from(selectedSet);
-                entitiesArr.sort((a,b) => entityTotals[b] - entityTotals[a]);
-            } 
+                entitiesArr.sort((a, b) => entityTotals[b] - entityTotals[a]);
+            }
             else {
                 if (activeTrendFilter) {
                     entitiesArr = entitiesArr.filter(e => e === activeTrendFilter);
                 }
             }
-            
+
             let isStacked = false;
             if (analysisMode === 'GROUP') {
                 isStacked = true;
@@ -2366,23 +2535,23 @@
                 const allSelected = (selectedProjects.size === currentTotalEntitiesCount && currentTotalEntitiesCount > 0);
                 isStacked = allSelected;
             }
-            
+
             const datasets = entitiesArr.map((entity, i) => {
                 return {
                     label: entity,
-                    data: labels.map(lbl => aggregated[lbl][entity] || 0), 
+                    data: labels.map(lbl => aggregated[lbl][entity] || 0),
                     backgroundColor: getColor(i),
-                    stack: isStacked ? 'Stack 0' : undefined, 
+                    stack: isStacked ? 'Stack 0' : undefined,
                 };
             });
 
             const ctxEl = document.getElementById('trendChart');
             if (!ctxEl) return;
             const ctx = ctxEl.getContext('2d');
-            
+
             if (trendChartInstance) {
                 trendChartInstance.destroy();
-                trendChartInstance = null; 
+                trendChartInstance = null;
             }
 
             trendChartInstance = new Chart(ctx, {
@@ -2398,30 +2567,30 @@
                         if (activeElements.length > 0) {
                             const datasetIndex = activeElements[0].datasetIndex;
                             const label = chart.data.datasets[datasetIndex].label;
-                            
+
                             if (analysisMode === 'PERSON') {
                                 togglePersonSelection(label);
                             } else if (analysisMode === 'PROJECT') {
                                 toggleProjectSelection(label);
                             } else {
                                 if (activeTrendFilter === label) {
-                                     activeTrendFilter = null;
+                                    activeTrendFilter = null;
                                 } else {
-                                     activeTrendFilter = label;
+                                    activeTrendFilter = label;
                                 }
                                 setTimeout(() => renderTrendAnalysis(), 0);
                             }
                         }
                     },
                     scales: {
-                        x: { 
+                        x: {
                             stacked: isStacked,
                             title: { display: isMonthlyMode, text: isMonthlyMode ? '月份' : '日期' }
                         },
-                        y: { 
-                            stacked: isStacked, 
-                            beginAtZero: true, 
-                            title: { display: true, text: '總工時 (hr)' } 
+                        y: {
+                            stacked: isStacked,
+                            beginAtZero: true,
+                            title: { display: true, text: '總工時 (hr)' }
                         }
                     },
                     plugins: {
@@ -2429,8 +2598,8 @@
                             mode: 'index',
                             intersect: false
                         },
-                        legend: { 
-                            position: 'bottom', 
+                        legend: {
+                            position: 'bottom',
                             labels: { boxWidth: 10, font: { size: 10 } },
                             onClick: (e, legendItem, legend) => {
                                 const label = legendItem.text;
@@ -2440,9 +2609,9 @@
                                     toggleProjectSelection(label);
                                 } else {
                                     if (activeTrendFilter === label) {
-                                         activeTrendFilter = null;
+                                        activeTrendFilter = null;
                                     } else {
-                                         activeTrendFilter = label;
+                                        activeTrendFilter = label;
                                     }
                                     setTimeout(() => renderTrendAnalysis(), 0);
                                 }
@@ -2457,12 +2626,12 @@
 
         function renderTrendTable(labels, entities, dataMap, rowStats, isMonthlyMode) {
             const table = document.getElementById('trendTable');
-            
+
             const totals = {};
             entities.forEach(e => {
                 totals[e] = labels.reduce((sum, lbl) => sum + (dataMap[lbl][e] || 0), 0);
             });
-            const sortedEntities = entities.sort((a,b) => totals[b] - totals[a]);
+            const sortedEntities = entities.sort((a, b) => totals[b] - totals[a]);
 
             const showAvg = (analysisMode === 'GROUP');
 
@@ -2470,7 +2639,7 @@
                 <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
                         <th class="px-2 py-2 font-bold text-slate-500">${isMonthlyMode ? '月份' : '日期'}</th>
-                        ${sortedEntities.map(e => `<th class="px-2 py-2 text-center text-slate-700 whitespace-nowrap">${e}</th>`).join('')}
+                        ${sortedEntities.map(e => `<th class="px-2 py-2 text-center text-slate-700 whitespace-nowrap">${escapeHtml(e)}</th>`).join('')}
                         <th class="px-2 py-2 text-right font-bold text-slate-700">總計</th>
                         ${showAvg ? '<th class="px-2 py-2 text-right font-bold text-indigo-600 bg-indigo-50/30">平均/人</th>' : ''}
                     </tr>
@@ -2479,13 +2648,13 @@
             `;
 
             const reversedLabels = [...labels].reverse();
-            
+
             reversedLabels.forEach(lbl => {
                 let rowTotal = 0;
                 const cells = sortedEntities.map(e => {
                     const val = dataMap[lbl][e] || 0;
                     rowTotal += val;
-                    return `<td class="px-2 py-2 text-center border-b border-slate-50 ${val===0 ? 'text-slate-200' : 'text-slate-600 font-mono'}">${val > 0 ? val.toFixed(1) : '-'}</td>`;
+                    return `<td class="px-2 py-2 text-center border-b border-slate-50 ${val === 0 ? 'text-slate-200' : 'text-slate-600 font-mono'}">${val > 0 ? val.toFixed(1) : '-'}</td>`;
                 });
 
                 let avgCell = '';
@@ -2500,14 +2669,14 @@
 
                 html += `
                     <tr class="hover:bg-slate-50 transition">
-                        <td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${lbl}</td>
+                        <td class="px-2 py-2 font-bold text-slate-500 border-b border-slate-50 whitespace-nowrap">${escapeHtml(lbl)}</td>
                         ${cells.join('')}
                         <td class="px-2 py-2 text-right font-bold text-slate-800 border-b border-slate-50 bg-slate-50/50">${rowTotal.toFixed(1)}</td>
                         ${avgCell}
                     </tr>
                 `;
             });
-            
+
             html += '</tbody>';
             table.innerHTML = html;
         }
@@ -2516,7 +2685,7 @@
         async function loadReportByDate(date, preventTabSwitch = false) {
             currentReportDate = date;
             const picker = document.getElementById('reportDatePicker');
-            if(picker) picker.value = date;
+            if (picker) picker.value = date;
             await updateHistoryList();
 
             const data = await getReportData(date);
@@ -2530,7 +2699,7 @@
                     currentDailyData.rows = [];
                 }
             }
-            
+
             if (preventTabSwitch) {
                 if (activeTab === 'OVERVIEW') {
                     renderData();
@@ -2546,13 +2715,13 @@
         async function switchToPreviousDay() {
             const currentDate = currentReportDate;
             const dateObj = new Date(currentDate + 'T00:00:00');
-            dateObj.setDate(dateObj.getDate() - 1); 
-            
+            dateObj.setDate(dateObj.getDate() - 1);
+
             const year = dateObj.getFullYear();
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
             const day = String(dateObj.getDate()).padStart(2, '0');
             const prevDayISO = `${year}-${month}-${day}`;
-            
+
             await loadReportByDate(prevDayISO);
             showToast(`已切換至前日 (${prevDayISO})`);
         }
@@ -2561,19 +2730,19 @@
             const currentDate = currentReportDate;
             const dateObj = new Date(currentDate + 'T00:00:00');
             dateObj.setDate(dateObj.getDate() + 1);
-            
+
             const year = dateObj.getFullYear();
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
             const day = String(dateObj.getDate()).padStart(2, '0');
             const nextDayISO = `${year}-${month}-${day}`;
-            
+
             await loadReportByDate(nextDayISO);
             showToast(`已切換至後日 (${nextDayISO})`);
         }
 
         async function handleDateChange() {
             const newDate = document.getElementById('reportDatePicker').value;
-            if(newDate) await loadReportByDate(newDate);
+            if (newDate) await loadReportByDate(newDate);
         }
 
         // 改為 async
@@ -2581,7 +2750,7 @@
             const dates = await getAvailableDates();
             const listEl = document.getElementById('historyList');
             listEl.innerHTML = '';
-            if(dates.length === 0) {
+            if (dates.length === 0) {
                 listEl.innerHTML = '<div class="text-xs text-slate-400 p-2 text-center">尚無紀錄</div>';
                 return;
             }
@@ -2614,13 +2783,13 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
-                    const data = JSON.parse(e.target.result);
+                    const data = stripDangerousKeys(JSON.parse(e.target.result));
                     if (data.projectMerges || data.groupMerges) {
                         if (data.projectMerges) globalSettings.projectMerges = data.projectMerges;
                         if (data.groupMerges) globalSettings.groupMerges = data.groupMerges;
-                        
-                        saveGlobalSettings(); 
-                        renderData(); 
+
+                        saveGlobalSettings();
+                        renderData();
                         showToast('設定匯入成功');
                     } else {
                         showToast('無效的設定檔格式');
@@ -2642,4 +2811,5 @@
         }
     </script>
 </body>
+
 </html>
